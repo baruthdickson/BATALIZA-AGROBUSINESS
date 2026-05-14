@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watumiaji - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6">
+      
+      <!-- Tabs -->
+      <div class="flex gap-2 border-b border-green-200">
+        <button class="tab-btn px-4 py-2 font-medium text-green-900 border-b-2 border-green-500" data-tab="users">Watumiaji</button>
+        <button class="tab-btn px-4 py-2 font-medium text-gray-500" data-tab="roles">Roles</button>
+        <button class="tab-btn px-4 py-2 font-medium text-gray-500" data-tab="audit">Audit Trail</button>
+      </div>
+      
+      <!-- USERS TAB -->
+      <div id="tab-users" class="space-y-4">
+        <div class="card flex flex-wrap items-end justify-between gap-3">
+          <div class="flex gap-3">
+            <div>
+              <label class="form-label">Role</label>
+              <select id="filter-role" class="form-select" style="min-width:160px"></select>
+            </div>
+            <div>
+              <label class="form-label">Tafuta</label>
+              <input type="text" id="filter-search" class="form-input" placeholder="Jina au email..." style="min-width:200px">
+            </div>
+          </div>
+          <button id="add-user-btn" class="btn btn-primary">+ Mtumiaji Mpya</button>
+        </div>
+        
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Jina</th><th>Email</th><th>Simu</th><th>Role</th>
+                <th>Status</th><th>Last Login</th><th>Vitendo</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="7" class="text-center text-gray-500 py-8">Inapakia...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- ROLES TAB -->
+      <div id="tab-roles" class="space-y-4 hidden">
+        <div class="card flex justify-between items-center">
+          <p class="text-gray-600 text-sm">Roles zinaonyesha aina ya watumiaji na ruhusa zao.</p>
+          <button id="add-role-btn" class="btn btn-primary">+ Role Mpya</button>
+        </div>
+        <div id="roles-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+      
+      <!-- AUDIT TRAIL TAB -->
+      <div id="tab-audit" class="space-y-4 hidden">
+        <div class="card flex flex-wrap items-end justify-between gap-3">
+          <div class="flex flex-wrap gap-3">
+            <div>
+              <label class="form-label">Mtumiaji</label>
+              <select id="audit-filter-user" class="form-select" style="min-width:180px">
+                <option value="">Wote</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Module</label>
+              <select id="audit-filter-module" class="form-select" style="min-width:140px">
+                <option value="">Zote</option>
+                <option value="auth">Auth</option>
+                <option value="budget">Budget</option>
+                <option value="expenses">Expenses</option>
+                <option value="hr">HR</option>
+                <option value="field_activities">Field Activities</option>
+                <option value="payroll">Payroll</option>
+                <option value="inventory">Inventory</option>
+                <option value="fleet">Fleet</option>
+                <option value="users">Users</option>
+                <option value="settings">Settings</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Tangu</label>
+              <input type="date" id="audit-filter-from" class="form-input">
+            </div>
+            <div>
+              <label class="form-label">Mpaka</label>
+              <input type="date" id="audit-filter-to" class="form-input">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button id="audit-refresh-btn" class="btn btn-secondary">🔄 Onyesha</button>
+            <button id="audit-export-btn" class="btn btn-primary">📥 Export</button>
+          </div>
+        </div>
+        
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tarehe</th><th>Mtumiaji</th><th>Module</th>
+                <th>Kitendo</th><th>Maelezo</th>
+              </tr>
+            </thead>
+            <tbody id="audit-tbody">
+              <tr><td colspan="5" class="text-center text-gray-500 py-8">Bofya "Onyesha" kuona shughuli</td></tr>
+            </tbody>
+          </table>
+          <div id="audit-pagination" class="flex justify-between items-center mt-4 text-sm text-gray-600"></div>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initUsers } from './js/pages/users.js';
+    
+    await requireBusinessUser();
+    if (!requirePermission('users', 'view')) throw new Error('No permission');
+    initLayout('Usimamizi wa Watumiaji');
+    await initUsers();
+  </script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Admin - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6">
+      
+      <!-- Welcome banner -->
+      <div class="card" style="background: linear-gradient(135deg, #14532D 0%, #15803D 100%); color: white;">
+        <h2 class="text-2xl font-bold mb-1">🔧 Karibu, System Admin</h2>
+        <p class="text-green-100 text-sm">Hii ni akaunti yako ya kiufundi. Una jukumu la kusimamia mfumo, sio shughuli za biashara.</p>
+        <div class="mt-3 text-xs text-green-200">
+          ⚠️ <strong>Privacy ya Mteja:</strong> Akaunti hii haina ruhusa ya kuona bajeti, matumizi, wala ripoti za kifedha za mteja.
+        </div>
+      </div>
+      
+      <!-- Quick stats -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="stat-card border-green-500">
+          <div class="text-xs text-gray-500 uppercase">Watumiaji Wote</div>
+          <div class="text-3xl font-bold text-green-900 mt-1" id="stat-users">-</div>
+          <div class="text-xs text-gray-500 mt-1">Bila kuhesabu admin</div>
+        </div>
+        <div class="stat-card border-blue-500">
+          <div class="text-xs text-gray-500 uppercase">Project Managers</div>
+          <div class="text-3xl font-bold text-green-900 mt-1" id="stat-pms">-</div>
+          <div class="text-xs text-gray-500 mt-1">Wamiliki wa mfumo</div>
+        </div>
+        <div class="stat-card border-orange-500">
+          <div class="text-xs text-gray-500 uppercase">Roles</div>
+          <div class="text-3xl font-bold text-green-900 mt-1" id="stat-roles">-</div>
+          <div class="text-xs text-gray-500 mt-1">Aina za watumiaji</div>
+        </div>
+        <div class="stat-card border-purple-500">
+          <div class="text-xs text-gray-500 uppercase">Logins (siku 7)</div>
+          <div class="text-3xl font-bold text-green-900 mt-1" id="stat-logins">-</div>
+          <div class="text-xs text-gray-500 mt-1">Shughuli za hivi karibuni</div>
+        </div>
+      </div>
+      
+      <!-- Tabs -->
+      <div class="flex gap-2 border-b border-green-200 flex-wrap">
+        <button class="tab-btn px-4 py-2 font-medium text-green-900 border-b-2 border-green-500" data-tab="pms">Project Managers</button>
+        <button class="tab-btn px-4 py-2 font-medium text-gray-500" data-tab="audit">Audit Logs (Zote)</button>
+        <button class="tab-btn px-4 py-2 font-medium text-gray-500" data-tab="system">System Info</button>
+      </div>
+      
+      <!-- PROJECT MANAGERS TAB -->
+      <div id="tab-pms" class="space-y-4">
+        <div class="card">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h3 class="text-lg font-bold text-green-900">Project Managers</h3>
+              <p class="text-sm text-gray-600">Akaunti za wamiliki wa mfumo. Unaweza kutengeneza PM mpya au reset password yake.</p>
+            </div>
+            <button id="add-pm-btn" class="btn btn-primary">+ Tengeneza Project Manager</button>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Jina</th><th>Email</th><th>Simu</th>
+                  <th>Status</th><th>Last Login</th><th>Vitendo</th>
+                </tr>
+              </thead>
+              <tbody id="pms-tbody">
+                <tr><td colspan="6" class="text-center text-gray-500 py-8">Inapakia...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- AUDIT LOGS TAB (admin sees ALL including hidden) -->
+      <div id="tab-audit" class="space-y-4 hidden">
+        <div class="card flex flex-wrap items-end justify-between gap-3">
+          <div class="flex flex-wrap gap-3">
+            <div>
+              <label class="form-label">Module</label>
+              <select id="audit-filter-module" class="form-select" style="min-width:140px">
+                <option value="">Zote</option>
+                <option value="auth">Auth</option>
+                <option value="users">Users</option>
+                <option value="budget">Budget</option>
+                <option value="expenses">Expenses</option>
+                <option value="hr">HR</option>
+                <option value="field_activities">Field Activities</option>
+                <option value="payroll">Payroll</option>
+                <option value="inventory">Inventory</option>
+                <option value="fleet">Fleet</option>
+                <option value="settings">Settings</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Tangu</label>
+              <input type="date" id="audit-filter-from" class="form-input">
+            </div>
+            <div>
+              <label class="form-label">Mpaka</label>
+              <input type="date" id="audit-filter-to" class="form-input">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button id="audit-refresh-btn" class="btn btn-secondary">🔄 Onyesha</button>
+            <button id="audit-export-btn" class="btn btn-primary">📥 Export</button>
+          </div>
+        </div>
+        
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tarehe</th><th>Mtumiaji</th><th>Module</th>
+                <th>Kitendo</th><th>Maelezo</th><th>Visible to PM</th>
+              </tr>
+            </thead>
+            <tbody id="audit-tbody">
+              <tr><td colspan="6" class="text-center text-gray-500 py-8">Bofya "Onyesha" kuona shughuli zote</td></tr>
+            </tbody>
+          </table>
+          <div id="audit-pagination" class="flex justify-between items-center mt-4 text-sm text-gray-600"></div>
+        </div>
+      </div>
+      
+      <!-- SYSTEM INFO TAB -->
+      <div id="tab-system" class="space-y-4 hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="card">
+            <h3 class="text-lg font-bold text-green-900 mb-3">📊 Database Statistics</h3>
+            <table class="w-full text-sm">
+              <tbody id="db-stats-tbody">
+                <tr><td colspan="2" class="text-center text-gray-500 py-4">Inapakia...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="card">
+            <h3 class="text-lg font-bold text-green-900 mb-3">⚙️ System Info</h3>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between border-b pb-2">
+                <span class="text-gray-600">Supabase URL</span>
+                <span class="font-mono text-xs" id="info-url">-</span>
+              </div>
+              <div class="flex justify-between border-b pb-2">
+                <span class="text-gray-600">App Version</span>
+                <span class="font-medium">1.0.0</span>
+              </div>
+              <div class="flex justify-between border-b pb-2">
+                <span class="text-gray-600">Browser</span>
+                <span class="font-medium text-xs" id="info-browser">-</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Tarehe ya Sasa</span>
+                <span class="font-medium" id="info-date">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <h3 class="text-lg font-bold text-green-900 mb-3">🛠️ Maintenance Actions</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button id="reset-pm-pwd-btn" class="btn btn-secondary text-left p-4">
+              <div class="font-bold">🔑 Reset PM Password</div>
+              <div class="text-xs text-gray-600 mt-1">Tuma password reset link kwa PM</div>
+            </button>
+            <a href="https://supabase.com/dashboard" target="_blank" class="btn btn-secondary text-left p-4 block no-underline">
+              <div class="font-bold">☁️ Supabase Dashboard</div>
+              <div class="text-xs text-gray-600 mt-1">Backup, restore, logs, n.k.</div>
+            </a>
+            <button id="view-errors-btn" class="btn btn-secondary text-left p-4">
+              <div class="font-bold">⚠️ View Recent Errors</div>
+              <div class="text-xs text-gray-600 mt-1">Failed actions kwenye audit</div>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, getCurrentProfile } from './js/auth.js';
+    import { initAdminLayout } from './js/layout.js';
+    import { initAdmin } from './js/pages/admin.js';
+    import { toast } from './js/utils.js';
+    
+    await requireAuth();
+    const profile = getCurrentProfile();
+    
+    // Strictly admin only
+    if (!profile?.is_system_admin) {
+      toast('Akaunti hii sio System Admin', 'error');
+      setTimeout(() => window.location.href = '/dashboard.html', 1500);
+      throw new Error('Not system admin');
+    }
+    
+    initAdminLayout('System Admin Dashboard');
+    await initAdmin();
+  </script>
+</body>
+</html>

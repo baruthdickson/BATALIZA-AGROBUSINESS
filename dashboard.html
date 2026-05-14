@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6">
+      
+      <!-- Stats Cards -->
+      <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-card">
+          <div class="stat-label">Bajeti ya Mradi</div>
+          <div class="stat-value" id="stat-total-budget">-</div>
+          <div class="stat-change text-gray-500" id="stat-budget-detail"></div>
+        </div>
+        <div class="stat-card" style="border-color: #2563EB;">
+          <div class="stat-label">Imetumika</div>
+          <div class="stat-value" id="stat-spent">-</div>
+          <div class="stat-change text-gray-500" id="stat-spent-percent"></div>
+        </div>
+        <div class="stat-card" style="border-color: #F59E0B;">
+          <div class="stat-label">Wafanyakazi</div>
+          <div class="stat-value" id="stat-employees">-</div>
+          <div class="stat-change text-gray-500">Wanaofanya kazi</div>
+        </div>
+        <div class="stat-card" style="border-color: #8B5CF6;">
+          <div class="stat-label">Hekta Zilizoendelea</div>
+          <div class="stat-value" id="stat-hectares">-</div>
+          <div class="stat-change text-gray-500" id="stat-hectares-detail"></div>
+        </div>
+      </div>
+      
+      <!-- Charts Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card">
+          <h3 class="text-lg font-bold text-green-900 mb-4">Bajeti vs Matumizi (kwa Section)</h3>
+          <canvas id="budget-chart" height="250"></canvas>
+        </div>
+        <div class="card">
+          <h3 class="text-lg font-bold text-green-900 mb-4">Matumizi kwa Wiki</h3>
+          <canvas id="expenses-chart" height="250"></canvas>
+        </div>
+      </div>
+      
+      <!-- Tables Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-green-900">⚠️ Vifungu Vinavyokaribia Kuvunja Bajeti</h3>
+          </div>
+          <div id="alerts-table"></div>
+        </div>
+        <div class="card">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-green-900">Matumizi ya Hivi Karibuni</h3>
+            <a href="expenses.html" class="text-sm text-green-600 hover:text-green-700">Zote →</a>
+          </div>
+          <div id="recent-expenses"></div>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initDashboard } from './js/pages/dashboard.js';
+    
+    await requireBusinessUser();
+    initLayout('Dashboard');
+    await initDashboard();
+  </script>
+</body>
+</html>

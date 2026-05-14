@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ripoti - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6">
+      
+      <div class="card">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <button class="btn btn-secondary report-btn" data-report="budget">📊 Budget vs Actual</button>
+          <button class="btn btn-secondary report-btn" data-report="expenses">🧾 Matumizi kwa Period</button>
+          <button class="btn btn-secondary report-btn" data-report="field">🌱 Field Progress</button>
+          <button class="btn btn-secondary report-btn" data-report="payroll">💰 Payroll Summary</button>
+        </div>
+      </div>
+      
+      <div class="card flex flex-wrap items-end gap-3">
+        <div>
+          <label class="form-label">Tangu</label>
+          <input type="date" id="report-from" class="form-input">
+        </div>
+        <div>
+          <label class="form-label">Hadi</label>
+          <input type="date" id="report-to" class="form-input">
+        </div>
+        <button id="generate-btn" class="btn btn-primary">Generate</button>
+        <button id="export-report-btn" class="btn btn-secondary">📥 Export CSV</button>
+      </div>
+      
+      <div id="report-container" class="card">
+        <div class="text-center text-gray-500 py-12">Chagua aina ya ripoti hapo juu</div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initReports } from './js/pages/reports.js';
+    
+    await requireBusinessUser();
+    if (!requirePermission('reports', 'view_dashboard')) throw new Error('No permission');
+    initLayout('Ripoti');
+    await initReports();
+  </script>
+</body>
+</html>

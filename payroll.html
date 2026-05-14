@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mishahara - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6">
+      
+      <div class="card flex flex-wrap items-end justify-between gap-3">
+        <div class="flex gap-3">
+          <div>
+            <label class="form-label">Period</label>
+            <select id="period-select" class="form-select" style="min-width:200px"></select>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button id="generate-btn" class="btn btn-secondary">⚡ Tengeneza kutoka Mahudhurio</button>
+          <button id="add-period-btn" class="btn btn-primary">+ Period Mpya</button>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="stat-card"><div class="stat-label">Wafanyakazi</div><div class="stat-value" id="stat-emps">-</div></div>
+        <div class="stat-card" style="border-color:#3B82F6"><div class="stat-label">Jumla ya Mshahara</div><div class="stat-value" id="stat-total">-</div></div>
+        <div class="stat-card" style="border-color:#22C55E"><div class="stat-label">Yamelipwa</div><div class="stat-value" id="stat-paid">-</div></div>
+        <div class="stat-card" style="border-color:#F59E0B"><div class="stat-label">Yanasubiri</div><div class="stat-value" id="stat-pending">-</div></div>
+      </div>
+      
+      <div class="card overflow-x-auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mfanyakazi</th><th class="text-right">Basic</th><th class="text-right">Allowance</th>
+              <th class="text-right">Overtime</th><th class="text-right">Deductions</th>
+              <th class="text-right">Days</th><th class="text-right">Net Pay</th>
+              <th>Status</th><th>Vitendo</th>
+            </tr>
+          </thead>
+          <tbody id="payroll-tbody">
+            <tr><td colspan="9" class="text-center text-gray-500 py-8">Chagua period</td></tr>
+          </tbody>
+        </table>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initPayroll } from './js/pages/payroll.js';
+    
+    await requireBusinessUser();
+    if (!requirePermission('payroll', 'view')) throw new Error('No permission');
+    initLayout('Mishahara');
+    await initPayroll();
+  </script>
+</body>
+</html>

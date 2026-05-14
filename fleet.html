@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Magari & Mafuta - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6">
+      
+      <div class="flex gap-2 border-b border-green-200">
+        <button class="tab-btn px-4 py-2 font-medium text-green-900 border-b-2 border-green-500" data-tab="vehicles">Magari</button>
+        <button class="tab-btn px-4 py-2 font-medium text-gray-500" data-tab="fuel">Mafuta</button>
+        <button class="tab-btn px-4 py-2 font-medium text-gray-500" data-tab="service">Service</button>
+      </div>
+      
+      <div id="tab-vehicles" class="space-y-4">
+        <div class="card flex justify-end gap-2">
+          <button id="add-vehicle-btn" class="btn btn-primary">+ Gari Jipya</button>
+        </div>
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Number</th><th>Type</th><th>Make/Model</th><th>Fuel</th>
+                <th class="text-right">Odometer</th><th>Status</th><th>Vitendo</th>
+              </tr>
+            </thead>
+            <tbody id="vehicles-tbody"><tr><td colspan="7" class="text-center text-gray-500 py-8">Inapakia...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div id="tab-fuel" class="space-y-4 hidden">
+        <div class="card flex justify-end gap-2">
+          <button id="add-fuel-btn" class="btn btn-primary">+ Fuel Log</button>
+        </div>
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tarehe</th><th>Gari</th><th>Type</th>
+                <th class="text-right">Liters</th><th class="text-right">Bei/Lt</th>
+                <th class="text-right">Total</th><th class="text-right">Odo</th>
+              </tr>
+            </thead>
+            <tbody id="fuel-tbody"><tr><td colspan="7" class="text-center text-gray-500 py-8">Inapakia...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div id="tab-service" class="space-y-4 hidden">
+        <div class="card flex justify-end gap-2">
+          <button id="add-service-btn" class="btn btn-primary">+ Service Record</button>
+        </div>
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tarehe</th><th>Gari</th><th>Type</th>
+                <th>Description</th><th class="text-right">Cost</th><th>Provider</th>
+              </tr>
+            </thead>
+            <tbody id="service-tbody"><tr><td colspan="6" class="text-center text-gray-500 py-8">Inapakia...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initFleet } from './js/pages/fleet.js';
+    
+    await requireBusinessUser();
+    if (!requirePermission('fleet', 'view')) throw new Error('No permission');
+    initLayout('Magari & Mafuta');
+    await initFleet();
+  </script>
+</body>
+</html>

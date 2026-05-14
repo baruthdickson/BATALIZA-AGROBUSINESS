@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bajeti - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-4 lg:p-6 space-y-4">
+      
+      <!-- Controls Card -->
+      <div class="card">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <label class="form-label mb-0 whitespace-nowrap">📅 Bajeti:</label>
+            <select id="period-select" class="form-select" style="width:auto;min-width:280px"></select>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="expand-all-btn" class="btn btn-secondary text-xs">▼ Fungua Zote</button>
+            <button id="collapse-all-btn" class="btn btn-secondary text-xs">▲ Funga Zote</button>
+            <button id="export-btn" class="btn btn-secondary">📥 Export</button>
+            <button id="add-period-btn" class="btn btn-secondary">+ Bajeti Mpya</button>
+            <button id="add-category-btn" class="btn btn-primary">+ Shughuli</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Summary stats -->
+      <div id="budget-summary"></div>
+      
+      <!-- Info banner -->
+      <div class="card" style="background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%); border-color: #BBF7D0;">
+        <div class="flex items-start gap-3">
+          <div class="text-2xl">💡</div>
+          <div class="text-sm">
+            <div class="font-bold text-green-900 mb-1">Jinsi ya Kutumia Bajeti</div>
+            <div class="text-green-800">
+              <strong>Shughuli</strong> (LSF, CCP, Bustani...) →
+              <strong>Group</strong> (Sub-categories, mfano: "Shughuli za Shamba") →
+              <strong>Line Items</strong> (mfano: "Kusafisha Shamba TSH 50,000"). 
+              Mfumo unahesabu jumla automatically kutoka chini hadi juu.
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Tree view -->
+      <div class="card p-0 overflow-x-auto">
+        <div id="budget-tree"></div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireBusinessUser, requirePermission } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initBudget } from './js/pages/budget.js';
+    
+    await requireBusinessUser();
+    if (!requirePermission('budget', 'view')) {}
+    initLayout('Bajeti');
+    await initBudget();
+  </script>
+</body>
+</html>

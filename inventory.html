@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vifaa & Stock - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6">
+      
+      <div class="flex gap-2 border-b border-green-200">
+        <button class="tab-btn px-4 py-2 font-medium text-green-900 border-b-2 border-green-500" data-tab="items">Vifaa</button>
+        <button class="tab-btn px-4 py-2 font-medium text-gray-500" data-tab="movements">Movements</button>
+      </div>
+      
+      <div id="tab-items" class="space-y-4">
+        <div class="card flex justify-between items-end gap-3">
+          <div class="flex gap-3">
+            <div>
+              <label class="form-label">Category</label>
+              <select id="filter-category" class="form-select"></select>
+            </div>
+            <div>
+              <label class="form-label">Tafuta</label>
+              <input type="text" id="filter-search" class="form-input" placeholder="Search...">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button id="stock-in-btn" class="btn btn-secondary">📥 Stock IN</button>
+            <button id="stock-out-btn" class="btn btn-secondary">📤 Stock OUT</button>
+            <button id="add-item-btn" class="btn btn-primary">+ Kifaa Kipya</button>
+          </div>
+        </div>
+        
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Code</th><th>Jina</th><th>Category</th><th>Unit</th>
+                <th class="text-right">Stock</th><th class="text-right">Min</th>
+                <th class="text-right">Bei</th><th>Status</th><th>Vitendo</th>
+              </tr>
+            </thead>
+            <tbody id="items-tbody"><tr><td colspan="9" class="text-center text-gray-500 py-8">Inapakia...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div id="tab-movements" class="space-y-4 hidden">
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tarehe</th><th>Type</th><th>Kifaa</th>
+                <th class="text-right">Qty</th><th class="text-right">Bei</th>
+                <th class="text-right">Jumla</th><th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="movements-tbody"><tr><td colspan="7" class="text-center text-gray-500 py-8">Inapakia...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initInventory } from './js/pages/inventory.js';
+    
+    await requireBusinessUser();
+    if (!requirePermission('inventory', 'view')) throw new Error('No permission');
+    initLayout('Vifaa & Stock');
+    await initInventory();
+  </script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shughuli za Shamba - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6">
+      
+      <div class="card flex flex-wrap items-end justify-between gap-3">
+        <div class="flex flex-wrap gap-3">
+          <div>
+            <label class="form-label">Status</label>
+            <select id="filter-status" class="form-select" style="width:auto">
+              <option value="">Zote</option>
+              <option value="not_started">Hazijaanza</option>
+              <option value="in_progress">Zinaendelea</option>
+              <option value="completed">Zimekamilika</option>
+              <option value="on_hold">Zimesimamishwa</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Tafuta</label>
+            <input type="text" id="filter-search" class="form-input" placeholder="Search..." style="width:auto;min-width:200px">
+          </div>
+        </div>
+        <button id="add-btn" class="btn btn-primary">+ Shughuli Mpya</button>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="stat-card"><div class="stat-label">Jumla ya Shughuli</div><div class="stat-value" id="stat-total">-</div></div>
+        <div class="stat-card" style="border-color:#22C55E"><div class="stat-label">Zinaendelea</div><div class="stat-value" id="stat-active">-</div></div>
+        <div class="stat-card" style="border-color:#3B82F6"><div class="stat-label">Hekta Zilizopangwa</div><div class="stat-value" id="stat-planned">-</div></div>
+        <div class="stat-card" style="border-color:#8B5CF6"><div class="stat-label">Hekta Zilizofanywa</div><div class="stat-value" id="stat-done">-</div></div>
+      </div>
+      
+      <div id="activities-container" class="space-y-3"></div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initFieldActivities } from './js/pages/field-activities.js';
+    
+    await requireBusinessUser();
+    if (!requirePermission('field_activities', 'view')) throw new Error('No permission');
+    initLayout('Shughuli za Shamba');
+    await initFieldActivities();
+  </script>
+</body>
+</html>

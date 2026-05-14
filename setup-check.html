@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup Check - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50 min-h-screen p-4 lg:p-8">
+  <div class="max-w-3xl mx-auto">
+    
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="text-2xl font-bold">
+          <span class="text-green-900">Mashamba</span> <span class="text-green-500">Makubwa</span>
+        </div>
+        <span class="text-gray-400">|</span>
+        <h1 class="text-xl font-bold text-green-900">🔍 Setup Diagnostic</h1>
+      </div>
+      <p class="text-sm text-gray-600">Hii page inakagua kama mfumo umefungwa vizuri. Itakuelekeza pa-pa kufanya kama kuna tatizo.</p>
+    </div>
+
+    <!-- Checks Container -->
+    <div id="checks-container" class="space-y-3">
+      <div class="bg-white rounded-lg shadow p-4">
+        <div class="animate-pulse text-center text-gray-500">Inakagua mfumo...</div>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="mt-6 flex flex-wrap gap-2 justify-center">
+      <button onclick="window.location.reload()" class="btn btn-secondary">🔄 Kagua Tena</button>
+      <a href="/index.html" class="btn btn-primary">← Rudi Login</a>
+    </div>
+
+    <!-- Help section -->
+    <div class="mt-6 bg-yellow-50 border border-yellow-300 rounded-lg p-4 text-sm">
+      <h3 class="font-bold text-yellow-900 mb-2">💡 Hatua za Kawaida Zinahitajika</h3>
+      <ol class="list-decimal list-inside space-y-1 text-yellow-900">
+        <li>Endesha <code class="bg-yellow-100 px-1 rounded">01_schema.sql</code> kwenye Supabase SQL Editor</li>
+        <li>Endesha <code class="bg-yellow-100 px-1 rounded">02_rls_policies.sql</code></li>
+        <li>Endesha <code class="bg-yellow-100 px-1 rounded">03_seed_data.sql</code></li>
+        <li>Tengeneza akaunti yako Supabase → Authentication → Users → Add user</li>
+        <li>Endesha <code class="bg-yellow-100 px-1 rounded">00_master_setup.sql</code></li>
+        <li>Logout na ingia upya</li>
+      </ol>
+    </div>
+  </div>
+
+  <script type="module">
+    import { supabase } from './js/supabase.js';
+    
+    const checks = [];
+    const container = document.getElementById('checks-container');
+    
+    function addCheck(name, status, message, action = null) {
+      checks.push({ name, status, message, action });
+      render();
+    }
+    
+    function render() {
+      container.innerHTML = checks.map(c => {
+        const colors = {
+          pass: 'bg-green-50 border-green-300 text-green-900',
+          fail: 'bg-red-50 border-red-300 text-red-900',
+          warn: 'bg-yellow-50 border-yellow-300 text-yellow-900',
+          info: 'bg-blue-50 border-blue-300 text-blue-900'
+        };
+        const icons = { pass: '✅', fail: '❌', warn: '⚠️', info: 'ℹ️' };
+        return `
+          <div class="border-l-4 rounded-lg p-4 shadow-sm ${colors[c.status]}">
+            <div class="flex items-start gap-3">
+              <div class="text-2xl">${icons[c.status]}</div>
+              <div class="flex-1">
+                <div class="font-bold">${c.name}</div>
+                <div class="text-sm mt-1">${c.message}</div>
+                ${c.action ? `<div class="text-sm mt-2 font-medium bg-white bg-opacity-50 px-3 py-2 rounded">${c.action}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    async function runChecks() {
+      checks.length = 0;
+      render();
+      
+      // Check 1: Connection
+      try {
+        await supabase.from('roles').select('id').limit(1);
+        addCheck('Supabase Connection', 'pass', 'Mfumo umeunganishwa na Supabase database');
+      } catch (e) {
+        addCheck('Supabase Connection', 'fail', 
+          'Imeshindikana kuunganishwa. Angalia config.js (SUPABASE_URL na SUPABASE_ANON_KEY).',
+          'Hakikisha credentials ziko sahihi kwenye js/config.js');
+        return;
+      }
+      
+      // Check 2: Tables exist
+      const requiredTables = ['users', 'roles', 'permissions', 'role_permissions', 'budget_periods', 'employees'];
+      let allTablesOK = true;
+      for (const table of requiredTables) {
+        try {
+          await supabase.from(table).select('*', { count: 'exact', head: true });
+        } catch (e) {
+          allTablesOK = false;
+          addCheck(`Table: ${table}`, 'fail', `Table "${table}" haipo`,
+            'Endesha sql/01_schema.sql kwenye Supabase SQL Editor');
+        }
+      }
+      if (allTablesOK) addCheck('Database Tables', 'pass', `Tables zote ${requiredTables.length} zipo`);
+      
+      // Check 3: Roles seeded
+      const { data: roles, error: rolesErr } = await supabase.from('roles').select('slug, name');
+      if (rolesErr || !roles || roles.length === 0) {
+        addCheck('Roles', 'fail', 'Hakuna roles kwenye database',
+          'Endesha sql/03_seed_data.sql');
+      } else {
+        const hasAdmin = roles.some(r => r.slug === 'system_admin');
+        const hasPM = roles.some(r => r.slug === 'project_manager');
+        if (hasAdmin && hasPM) {
+          addCheck('Roles', 'pass', `Roles ${roles.length} zipo (system_admin ✓, project_manager ✓)`);
+        } else {
+          addCheck('Roles', 'fail', `Roles muhimu hazipo: ${!hasAdmin ? 'system_admin' : ''} ${!hasPM ? 'project_manager' : ''}`,
+            'Endesha sql/03_seed_data.sql');
+        }
+      }
+      
+      // Check 4: Permissions seeded
+      const { count: permCount } = await supabase.from('permissions').select('*', { count: 'exact', head: true });
+      if (!permCount || permCount === 0) {
+        addCheck('Permissions', 'fail', 'Hakuna permissions kwenye database',
+          'Endesha sql/03_seed_data.sql');
+      } else if (permCount < 40) {
+        addCheck('Permissions', 'warn', `Permissions chache (${permCount}). Inategemea zinatakiwa ~44`,
+          'Endesha tena sql/03_seed_data.sql');
+      } else {
+        addCheck('Permissions', 'pass', `Permissions ${permCount} zipo`);
+      }
+      
+      // Check 5: Role_permissions populated
+      const { data: pmRole } = await supabase.from('roles').select('id').eq('slug', 'project_manager').single();
+      if (pmRole) {
+        const { count: pmPermCount } = await supabase.from('role_permissions')
+          .select('*', { count: 'exact', head: true })
+          .eq('role_id', pmRole.id);
+        if (!pmPermCount || pmPermCount === 0) {
+          addCheck('PM Permissions Mapping', 'fail', 'Role ya project_manager haina permissions',
+            'Endesha sql/00_master_setup.sql');
+        } else {
+          addCheck('PM Permissions Mapping', 'pass', `Project Manager ina permissions ${pmPermCount}`);
+        }
+      }
+      
+      // Check 6: Current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        addCheck('Login Session', 'info', 'Hujaingia kwenye mfumo (hakuna session)',
+          'Nenda /index.html kuingia');
+      } else {
+        addCheck('Login Session', 'pass', `Umeingia: ${session.user.email}`);
+        
+        // Check 7: Profile exists
+        const { data: profile, error: profErr } = await supabase
+          .from('users')
+          .select('*, role:roles(name, slug)')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        
+        if (profErr || !profile) {
+          addCheck('User Profile', 'fail', 
+            `auth user yupo lakini profile haipo kwenye public.users`,
+            `Endesha sql/00_master_setup.sql (badilisha email kuwa: ${session.user.email})`);
+        } else {
+          if (profile.is_system_admin) {
+            addCheck('User Profile', 'pass', 
+              `Wewe ni System Admin: ${profile.full_name} (${profile.role?.name || 'no role'})`,
+              `Nenda /admin.html kutumia mfumo`);
+          } else if (profile.role?.slug === 'project_manager') {
+            addCheck('User Profile', 'pass', 
+              `Wewe ni Project Manager: ${profile.full_name}`,
+              `Nenda /dashboard.html kutumia mfumo`);
+          } else if (profile.role) {
+            addCheck('User Profile', 'pass', 
+              `Wewe ni: ${profile.full_name} (${profile.role.name})`);
+          } else {
+            addCheck('User Profile', 'warn', 
+              `Profile ipo lakini huna role`,
+              'Admin akupatie role');
+          }
+          
+          // Check 8: User permissions
+          if (profile.role_id) {
+            const { count: userPermCount } = await supabase.from('role_permissions')
+              .select('*', { count: 'exact', head: true })
+              .eq('role_id', profile.role_id);
+            
+            if (!userPermCount || userPermCount === 0) {
+              addCheck('Your Permissions', 'fail', 
+                'Role yako haina permissions zozote — ndio sababu sidebar haina menu items',
+                'Endesha sql/00_master_setup.sql kurekebisha');
+            } else {
+              addCheck('Your Permissions', 'pass', `Una permissions ${userPermCount}`);
+            }
+          }
+        }
+      }
+      
+      // Check 9: Any PMs exist
+      const { data: pmRoleCheck } = await supabase.from('roles').select('id').eq('slug', 'project_manager').single();
+      if (pmRoleCheck) {
+        const { count: pmCount } = await supabase.from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('role_id', pmRoleCheck.id)
+          .is('deleted_at', null);
+        if (!pmCount || pmCount === 0) {
+          addCheck('Project Manager Account', 'warn', 
+            'Hakuna Project Manager bado',
+            'Ingia kama Admin → admin.html → bofya "Tengeneza Project Manager"');
+        } else {
+          addCheck('Project Manager Account', 'pass', `Kuna PM ${pmCount}`);
+        }
+      }
+      
+      // Summary
+      const failed = checks.filter(c => c.status === 'fail').length;
+      const warned = checks.filter(c => c.status === 'warn').length;
+      
+      const summary = document.createElement('div');
+      summary.className = `mt-4 p-4 rounded-lg font-bold text-center ${
+        failed > 0 ? 'bg-red-100 text-red-900' : 
+        warned > 0 ? 'bg-yellow-100 text-yellow-900' : 
+        'bg-green-100 text-green-900'
+      }`;
+      summary.innerHTML = failed > 0 
+        ? `❌ Kuna ${failed} matatizo. Fuatilia hatua zilizoonyeshwa.`
+        : warned > 0 
+        ? `⚠️ Mfumo unafanya kazi, lakini kuna ${warned} mambo ya kuangalia.`
+        : `✅ MFUMO UMESETUP VIZURI KIKAMILIFU!`;
+      container.appendChild(summary);
+    }
+    
+    runChecks();
+  </script>
+</body>
+</html>

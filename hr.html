@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wafanyakazi - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6">
+      
+      <!-- Tabs -->
+      <div class="flex gap-2 border-b border-green-200">
+        <button class="tab-btn px-4 py-2 font-medium text-green-900 border-b-2 border-green-500" data-tab="employees">Wafanyakazi</button>
+        <button class="tab-btn px-4 py-2 font-medium text-gray-500" data-tab="attendance">Mahudhurio</button>
+      </div>
+      
+      <!-- EMPLOYEES TAB -->
+      <div id="tab-employees" class="space-y-4">
+        <div class="card flex flex-wrap items-end justify-between gap-3">
+          <div class="flex flex-wrap gap-3">
+            <div>
+              <label class="form-label">Category</label>
+              <select id="filter-category" class="form-select" style="width:auto;min-width:160px">
+                <option value="">Zote</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Status</label>
+              <select id="filter-emp-status" class="form-select" style="width:auto">
+                <option value="active">Active</option>
+                <option value="">Zote</option>
+                <option value="inactive">Inactive</option>
+                <option value="terminated">Terminated</option>
+                <option value="on_leave">On Leave</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Tafuta</label>
+              <input type="text" id="filter-emp-search" class="form-input" placeholder="Jina, simu, NIDA..." style="width:auto;min-width:200px">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button id="export-emp-btn" class="btn btn-secondary">📥 Export</button>
+            <button id="add-emp-btn" class="btn btn-primary">+ Mfanyakazi Mpya</button>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="stat-card"><div class="stat-label">Jumla</div><div class="stat-value" id="emp-total">-</div></div>
+          <div class="stat-card" style="border-color:#22C55E"><div class="stat-label">Active</div><div class="stat-value" id="emp-active">-</div></div>
+          <div class="stat-card" style="border-color:#F59E0B"><div class="stat-label">On Leave</div><div class="stat-value" id="emp-leave">-</div></div>
+          <div class="stat-card" style="border-color:#6B7280"><div class="stat-label">Terminated</div><div class="stat-value" id="emp-terminated">-</div></div>
+        </div>
+        
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Jina</th><th>Category</th><th>NIDA</th><th>Simu</th>
+                <th class="text-right">Mshahara</th><th>Status</th><th>Vitendo</th>
+              </tr>
+            </thead>
+            <tbody id="employees-tbody">
+              <tr><td colspan="8" class="text-center text-gray-500 py-8">Inapakia...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- ATTENDANCE TAB -->
+      <div id="tab-attendance" class="space-y-4 hidden">
+        <div class="card flex flex-wrap items-end justify-between gap-3">
+          <div class="flex flex-wrap gap-3">
+            <div>
+              <label class="form-label">Tarehe</label>
+              <input type="date" id="att-date" class="form-input" style="width:auto">
+            </div>
+          </div>
+          <button id="save-attendance-btn" class="btn btn-primary">💾 Hifadhi Mahudhurio</button>
+        </div>
+        
+        <div class="card overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mfanyakazi</th><th>Category</th>
+                <th>Status</th><th>Check In</th><th>Check Out</th><th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="attendance-tbody">
+              <tr><td colspan="6" class="text-center text-gray-500 py-8">Chagua tarehe</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initHR } from './js/pages/hr.js';
+    
+    await requireBusinessUser();
+    if (!requirePermission('hr', 'view')) throw new Error('No permission');
+    initLayout('Wafanyakazi & Mahudhurio');
+    await initHR();
+  </script>
+</body>
+</html>

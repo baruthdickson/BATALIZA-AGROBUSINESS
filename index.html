@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingia - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 p-4">
+  
+  <div class="w-full max-w-md">
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="inline-block bg-white rounded-full p-2 shadow-xl mb-4">
+        <img src="assets/logo.jpg" alt="Bataliza Agrobusiness" class="w-28 h-28 rounded-full object-cover">
+      </div>
+      <div class="text-3xl font-bold text-green-900 tracking-tight">BATALIZA</div>
+      <div class="text-base text-green-600 font-semibold tracking-widest">AGROBUSINESS</div>
+      <p class="text-sm text-gray-600 mt-2">Mfumo wa Usimamizi wa Kibiashara</p>
+    </div>
+    
+    <!-- Login Card -->
+    <div class="bg-white rounded-2xl shadow-xl p-8">
+      <h1 class="text-2xl font-bold text-green-900 mb-2">Karibu!</h1>
+      <p class="text-gray-600 mb-6">Ingia kuendelea</p>
+      
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="form-label">Email</label>
+          <input type="email" id="email" required class="form-input" placeholder="email@example.com">
+        </div>
+        
+        <div>
+          <label class="form-label">Password</label>
+          <div class="relative">
+            <input type="password" id="password" required class="form-input pr-10" placeholder="••••••••">
+            <button type="button" id="toggle-password" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-600">
+              👁
+            </button>
+          </div>
+        </div>
+        
+        <div class="flex items-center justify-between text-sm">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="remember" class="rounded">
+            <span class="text-gray-700">Nikumbuke</span>
+          </label>
+          <a href="#" id="forgot-link" class="text-green-600 hover:text-green-700">Umesahau password?</a>
+        </div>
+        
+        <button type="submit" id="login-btn" class="btn btn-primary w-full py-3">
+          <span id="btn-text">Ingia</span>
+          <span id="btn-loader" class="hidden animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+        </button>
+        
+        <div id="error-msg" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm"></div>
+      </form>
+    </div>
+    
+    <p class="text-center text-sm text-gray-500 mt-6">
+      © 2026 BATALIZA AGROBUSINESS • Tabora-Urambo, Tanzania
+    </p>
+  </div>
+  
+  <!-- Forgot Password Modal -->
+  <div id="forgot-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+      <h3 class="text-xl font-bold text-green-900 mb-3">Reset Password</h3>
+      <p class="text-gray-600 mb-4">Weka email yako, tutakupelekea link ya kubadilisha password.</p>
+      <input type="email" id="reset-email" class="form-input mb-4" placeholder="email@example.com">
+      <div class="flex justify-end gap-3">
+        <button id="reset-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="reset-send" class="btn btn-primary">Tuma</button>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { login, sendPasswordReset, loadProfile, getHomePage } from './js/auth.js';
+    import { supabase } from './js/supabase.js';
+    import { toast } from './js/utils.js';
+    
+    // Check if already logged in
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await loadProfile();
+      window.location.href = getHomePage();
+    }
+    
+    // Toggle password visibility
+    document.getElementById('toggle-password').onclick = () => {
+      const input = document.getElementById('password');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    };
+    
+    // Login form
+    document.getElementById('login-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('login-btn');
+      const btnText = document.getElementById('btn-text');
+      const btnLoader = document.getElementById('btn-loader');
+      const errorMsg = document.getElementById('error-msg');
+      
+      btn.disabled = true;
+      btnText.classList.add('hidden');
+      btnLoader.classList.remove('hidden');
+      errorMsg.classList.add('hidden');
+      
+      try {
+        await login(email, password);
+        toast('Umeingia kwa ufanisi!', 'success');
+        setTimeout(() => window.location.href = getHomePage(), 500);
+      } catch (error) {
+        errorMsg.textContent = error.message || 'Email au password si sahihi';
+        errorMsg.classList.remove('hidden');
+        btn.disabled = false;
+        btnText.classList.remove('hidden');
+        btnLoader.classList.add('hidden');
+      }
+    };
+    
+    // Forgot password
+    document.getElementById('forgot-link').onclick = (e) => {
+      e.preventDefault();
+      document.getElementById('forgot-modal').classList.remove('hidden');
+    };
+    document.getElementById('reset-cancel').onclick = () => {
+      document.getElementById('forgot-modal').classList.add('hidden');
+    };
+    document.getElementById('reset-send').onclick = async () => {
+      const email = document.getElementById('reset-email').value;
+      if (!email) { toast('Weka email', 'warning'); return; }
+      try {
+        await sendPasswordReset(email);
+        toast('Tumekutumia link kwenye email yako!', 'success');
+        document.getElementById('forgot-modal').classList.add('hidden');
+      } catch (error) {
+        toast(error.message, 'error');
+      }
+    };
+  </script>
+</body>
+</html>

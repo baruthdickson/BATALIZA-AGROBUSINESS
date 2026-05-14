@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-green-50">
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-6 space-y-6 max-w-4xl">
+      
+      <!-- Tabs -->
+      <div class="flex gap-2 border-b border-green-200">
+        <button class="tab-btn px-4 py-2 font-medium text-green-900 border-b-2 border-green-500" data-tab="company">Kampuni</button>
+        <button class="tab-btn px-4 py-2 font-medium text-gray-500" data-tab="system">System</button>
+      </div>
+      
+      <!-- COMPANY TAB -->
+      <div id="tab-company" class="space-y-4">
+        <div class="card">
+          <h2 class="text-xl font-bold text-green-900 mb-4">Taarifa za Kampuni</h2>
+          <form id="company-form" class="space-y-4">
+            <div>
+              <label class="form-label">Jina la Kampuni</label>
+              <input type="text" name="company_name" required class="form-input">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="form-label">Mkoa</label>
+                <input type="text" name="region" class="form-input">
+              </div>
+              <div>
+                <label class="form-label">Wilaya</label>
+                <input type="text" name="district" class="form-input">
+              </div>
+            </div>
+            <div>
+              <label class="form-label">Anwani</label>
+              <textarea name="address" class="form-textarea" rows="2"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="form-label">Simu</label>
+                <input type="tel" name="phone" class="form-input">
+              </div>
+              <div>
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-input">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="form-label">TIN</label>
+                <input type="text" name="tin_number" class="form-input">
+              </div>
+              <div>
+                <label class="form-label">VRN</label>
+                <input type="text" name="vrn_number" class="form-input">
+              </div>
+            </div>
+            <div>
+              <label class="form-label">Website</label>
+              <input type="url" name="website" class="form-input">
+            </div>
+            <div class="flex justify-end">
+              <button type="submit" class="btn btn-primary">Hifadhi</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      <!-- SYSTEM TAB -->
+      <div id="tab-system" class="space-y-4 hidden">
+        <div class="card">
+          <h2 class="text-xl font-bold text-green-900 mb-4">System Settings</h2>
+          <div id="settings-list" class="space-y-3">
+            <div class="text-center text-gray-500 py-4">Inapakia...</div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script type="module">
+    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initSettings } from './js/pages/settings.js';
+    
+    await requireBusinessUser();
+    if (!requirePermission('system', 'edit_company')) throw new Error('No permission');
+    initLayout('Settings');
+    await initSettings();
+  </script>
+</body>
+</html>
