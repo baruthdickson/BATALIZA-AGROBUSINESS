@@ -31,24 +31,122 @@ async function loadPlots() {
 }
 
 async function loadBudgetItems() {
-  // Load only leaf items (items that can have actual expenses)
-  const { data } = await supabase
+  // Try with categories join first
+  let { data, error } = await supabase
     .from('budget_items')
     .select('id, code, item, category_id, item_type, total_planned, total_actual, budget_categories(name, code, period_id)')
     .eq('item_type', 'leaf')
     .order('code');
+  
+  // Fallback bila join kama relationship haijapatikana
+  if (error) {
+    const fb = await supabase
+      .from('budget_items')
+      .select('id, code, item, category_id, item_type, total_planned, total_actual')
+      .eq('item_type', 'leaf')
+      .order('code');
+    data = fb.data;
+    error = fb.error;
+    
+    // Enrich client-side
+    if (data && data.length > 0) {
+      const catIds = [...new Set(data.map(b => b.category_id).filter(Boolean))];
+      if (catIds.length > 0) {
+        const { data: cats } = await supabase.from('budget_categories').select('id, name, code, period_id').in('id', catIds);
+        const catMap = {};
+        (cats || []).forEach(c => catMap[c.id] = c);
+        data.forEach(b => { if (catMap[b.category_id]) b.budget_categories = catMap[b.category_id]; });
+      }
+    }
+  }
+  
   budgetItems = data || [];
 }
 
 async function loadExpenses() {
-  const { data, error } = await supabase
+  // Try with full joins first
+  let { data, error } = await supabase
     .from('expenses')
     .select('*, budget_item:budget_items(code, item), plot:plots(name, code), approver:approved_by(full_name)')
     .order('expense_date', { ascending: false })
     .limit(500);
-  if (error) { toast('Imeshindikana kupakia matumizi', 'error'); return; }
+  
+  // Fallback 1: bila approver join
+  if (error) {
+    console.warn('Full join failed, trying without approver:', error.message);
+    const fb1 = await supabase
+      .from('expenses')
+      .select('*, budget_item:budget_items(code, item), plot:plots(name, code)')
+      .order('expense_date', { ascending: false })
+      .limit(500);
+    data = fb1.data;
+    error = fb1.error;
+  }
+  
+  // Fallback 2: bila joins yote
+  if (error) {
+    console.warn('Joins failed, loading plain:', error.message);
+    const fb2 = await supabase
+      .from('expenses')
+      .select('*')
+      .order('expense_date', { ascending: false })
+      .limit(500);
+    data = fb2.data;
+    error = fb2.error;
+  }
+  
+  if (error) { 
+    toast('Imeshindikana: ' + error.message, 'error'); 
+    document.getElementById('expenses-tbody').innerHTML = `<tr><td colspan="9" class="text-center text-red-600 py-8">${error.message}</td></tr>`;
+    return; 
+  }
+  
   allExpenses = data || [];
+  
+  // Enrich client-side kama joins zilifeli
+  await enrichExpensesClientSide();
+  
   applyFilters();
+}
+
+async function enrichExpensesClientSide() {
+  // Enrich approver
+  const approverIds = [...new Set(allExpenses.map(e => e.approved_by).filter(id => id && !e.approver))];
+  if (approverIds.length > 0) {
+    const { data: users } = await supabase.from('users').select('id, full_name').in('id', approverIds);
+    const userMap = {};
+    (users || []).forEach(u => userMap[u.id] = u);
+    allExpenses.forEach(e => {
+      if (e.approved_by && userMap[e.approved_by] && !e.approver) {
+        e.approver = userMap[e.approved_by];
+      }
+    });
+  }
+  
+  // Enrich plot
+  const plotIds = [...new Set(allExpenses.map(e => e.plot_id).filter(id => id && !plots.find(p => p.id === id)))];
+  allExpenses.forEach(e => {
+    if (e.plot_id && !e.plot) {
+      const p = plots.find(plot => plot.id === e.plot_id);
+      if (p) e.plot = { name: p.name, code: p.code };
+    }
+  });
+  
+  // Enrich budget_item
+  const itemIds = [...new Set(allExpenses.map(e => e.budget_item_id).filter(Boolean))];
+  if (itemIds.length > 0) {
+    const missingIds = itemIds.filter(id => !allExpenses.find(e => e.budget_item_id === id && e.budget_item));
+    if (missingIds.length > 0) {
+      const { data: items } = await supabase.from('budget_items').select('id, code, item').in('id', missingIds);
+      const itemMap = {};
+      (items || []).forEach(i => itemMap[i.id] = i);
+      allExpenses.forEach(e => {
+        if (e.budget_item_id && itemMap[e.budget_item_id] && !e.budget_item) {
+          e.budget_item = { code: itemMap[e.budget_item_id].code, item: itemMap[e.budget_item_id].item };
+        }
+      });
+    }
+  }
 }
 
 function applyFilters() {
