@@ -8,15 +8,20 @@ import { supabase } from './supabase.js';
 // ============================================================================
 // MENU ITEMS (kila item ina required permission)
 // ============================================================================
+// ============================================================================
+// FOCUS: Bajeti + Matumizi vinaonyeshwa kikamilifu.
+// Vingine vimefichwa kwa sasa (mteja ataongeza baadaye)
+// ============================================================================
 const MENU_ITEMS = [
   { icon: '📊', label: 'Dashboard', href: 'dashboard.html', perm: ['reports', 'view_dashboard'] },
   { icon: '💵', label: 'Bajeti', href: 'budget.html', perm: ['budget', 'view'] },
   { icon: '🧾', label: 'Matumizi', href: 'expenses.html', perm: ['expenses', 'view'] },
-  { icon: '🌱', label: 'Shughuli za Shamba', href: 'field-activities.html', perm: ['field_activities', 'view'] },
-  { icon: '👥', label: 'Wafanyakazi', href: 'hr.html', perm: ['hr', 'view'] },
-  { icon: '💰', label: 'Mishahara', href: 'payroll.html', perm: ['payroll', 'view'] },
-  { icon: '📦', label: 'Vifaa & Stock', href: 'inventory.html', perm: ['inventory', 'view'] },
-  { icon: '🚜', label: 'Magari & Mafuta', href: 'fleet.html', perm: ['fleet', 'view'] },
+  // === VIPENGELE VYA BAADAYE (vimefichwa kwa sasa) ===
+  // { icon: '🌱', label: 'Shughuli za Shamba', href: 'field-activities.html', perm: ['field_activities', 'view'] },
+  // { icon: '👥', label: 'Wafanyakazi', href: 'hr.html', perm: ['hr', 'view'] },
+  // { icon: '💰', label: 'Mishahara', href: 'payroll.html', perm: ['payroll', 'view'] },
+  // { icon: '📦', label: 'Vifaa & Stock', href: 'inventory.html', perm: ['inventory', 'view'] },
+  // { icon: '🚜', label: 'Magari & Mafuta', href: 'fleet.html', perm: ['fleet', 'view'] },
   { icon: '📈', label: 'Ripoti', href: 'reports.html', perm: ['reports', 'view_dashboard'] },
 ];
 

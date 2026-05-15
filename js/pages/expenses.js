@@ -1,434 +1,408 @@
 // ============================================================================
-// EXPENSES MODULE - Matumizi management
+// MATUMIZI MODULE - Simplified, Focused
+// Inahitajika: Tarehe, Shamba, Kiasi, Aliyeidhinisha, Maelezo, Risiti (optional)
 // ============================================================================
-
 import { supabase } from '../supabase.js';
 import { hasPermission, getCurrentProfile } from '../auth.js';
-import { formatTZS, formatDate, todayISO, toast, confirm, createModal, exportToCSV, exportMenu, debounce, escapeHtml, logAction } from '../utils.js';
+import { formatTZS, formatDate, todayISO, toast, confirm, createModal, exportMenu, debounce, escapeHtml, logAction, formatNumber } from '../utils.js';
 
 let allExpenses = [];
 let filteredExpenses = [];
+let plots = [];
 let budgetItems = [];
-let suppliers = [];
 let currentPage = 1;
-const pageSize = 25;
+const PAGE_SIZE = 25;
 
 export async function initExpenses() {
-  await loadBudgetItems();
-  await loadSuppliers();
-  await loadExpenses();
+  await Promise.all([loadPlots(), loadBudgetItems(), loadExpenses()]);
   bindEvents();
+  renderStats();
 }
 
-// ============================================================================
-// LOAD DATA
-// ============================================================================
+async function loadPlots() {
+  const { data } = await supabase.from('plots').select('*').order('code');
+  plots = data || [];
+  // Populate filters and modals
+  const filter = document.getElementById('filter-plot');
+  if (filter) {
+    filter.innerHTML = '<option value="">Mashamba Yote</option>' +
+      plots.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  }
+}
+
 async function loadBudgetItems() {
+  // Load only leaf items (items that can have actual expenses)
   const { data } = await supabase
     .from('budget_items')
-    .select('id, code, item')
+    .select('id, code, item, category_id, item_type, total_planned, total_actual, budget_categories(name, code, period_id)')
+    .eq('item_type', 'leaf')
     .order('code');
   budgetItems = data || [];
-}
-
-async function loadSuppliers() {
-  const { data } = await supabase
-    .from('suppliers')
-    .select('id, name')
-    .eq('status', 'active')
-    .order('name');
-  suppliers = data || [];
 }
 
 async function loadExpenses() {
   const { data, error } = await supabase
     .from('expenses')
-    .select(`
-      *,
-      budget_item:budget_items(id, code, item),
-      supplier:suppliers(id, name),
-      recorder:users!expenses_recorded_by_fkey(full_name)
-    `)
-    .is('deleted_at', null)
-    .order('expense_date', { ascending: false });
-  
-  if (error) { toast(error.message, 'error'); return; }
-  
+    .select('*, budget_item:budget_items(code, item), plot:plots(name, code), approver:approved_by(full_name)')
+    .order('expense_date', { ascending: false })
+    .limit(500);
+  if (error) { toast('Imeshindikana kupakia matumizi', 'error'); return; }
   allExpenses = data || [];
   applyFilters();
 }
 
-// ============================================================================
-// FILTERS
-// ============================================================================
 function applyFilters() {
-  const status = document.getElementById('filter-status').value;
-  const from = document.getElementById('filter-from').value;
-  const to = document.getElementById('filter-to').value;
-  const search = document.getElementById('filter-search').value.toLowerCase();
+  const status = document.getElementById('filter-status')?.value || '';
+  const plotId = document.getElementById('filter-plot')?.value || '';
+  const search = document.getElementById('filter-search')?.value.toLowerCase() || '';
+  const fromDate = document.getElementById('filter-from')?.value;
+  const toDate = document.getElementById('filter-to')?.value;
   
   filteredExpenses = allExpenses.filter(e => {
     if (status && e.status !== status) return false;
-    if (from && e.expense_date < from) return false;
-    if (to && e.expense_date > to) return false;
+    if (plotId && e.plot_id != plotId) return false;
+    if (fromDate && e.expense_date < fromDate) return false;
+    if (toDate && e.expense_date > toDate) return false;
     if (search) {
-      const text = `${e.description} ${e.budget_item?.code || ''} ${e.budget_item?.item || ''} ${e.supplier_name || ''}`.toLowerCase();
-      if (!text.includes(search)) return false;
+      const haystack = `${e.description} ${e.supplier_name || ''} ${e.budget_item?.item || ''} ${e.plot?.name || ''}`.toLowerCase();
+      if (!haystack.includes(search)) return false;
     }
     return true;
   });
-  
   currentPage = 1;
-  renderSummary();
-  renderTable();
+  renderExpenses();
+  renderStats();
 }
 
-function renderSummary() {
-  const total = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
-  const pending = filteredExpenses.filter(e => e.status === 'pending').reduce((s, e) => s + Number(e.amount), 0);
-  const approved = filteredExpenses.filter(e => e.status === 'approved').reduce((s, e) => s + Number(e.amount), 0);
-  const rejected = filteredExpenses.filter(e => e.status === 'rejected').reduce((s, e) => s + Number(e.amount), 0);
+function renderStats() {
+  const pending = allExpenses.filter(e => e.status === 'pending');
+  const approved = allExpenses.filter(e => e.status === 'approved');
+  const thisMonth = approved.filter(e => {
+    const d = new Date(e.expense_date);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
   
-  document.getElementById('sum-total').textContent = formatTZS(total);
-  document.getElementById('sum-pending').textContent = formatTZS(pending);
-  document.getElementById('sum-approved').textContent = formatTZS(approved);
-  document.getElementById('sum-rejected').textContent = formatTZS(rejected);
+  const totalApproved = approved.reduce((s, e) => s + Number(e.amount), 0);
+  const totalPending = pending.reduce((s, e) => s + Number(e.amount), 0);
+  const totalMonth = thisMonth.reduce((s, e) => s + Number(e.amount), 0);
+  
+  const el = document.getElementById('expense-stats');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="stat-card">
+        <div class="stat-label">Jumla Yaliyoidhinishwa</div>
+        <div class="stat-value money">${formatTZS(totalApproved)}</div>
+        <div class="stat-sub">${approved.length} matumizi</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-label">Yanasubiri</div>
+        <div class="stat-value money">${formatTZS(totalPending)}</div>
+        <div class="stat-sub">${pending.length} ya kuidhinishwa</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-label">Mwezi Huu</div>
+        <div class="stat-value money">${formatTZS(totalMonth)}</div>
+        <div class="stat-sub">${thisMonth.length} matumizi</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-label">Jumla Yote</div>
+        <div class="stat-value">${allExpenses.length}</div>
+        <div class="stat-sub">Yote yaliyoingizwa</div>
+      </div>
+    </div>`;
 }
 
-// ============================================================================
-// RENDER TABLE
-// ============================================================================
-function renderTable() {
+function renderExpenses() {
   const tbody = document.getElementById('expenses-tbody');
+  if (!tbody) return;
   
   if (filteredExpenses.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-8">Hakuna matumizi</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-gray-500 py-12">
+      <div class="text-5xl mb-2">📋</div>
+      <div>Hakuna matumizi yaliyopatikana</div>
+      ${hasPermission('expenses', 'create') ? '<button onclick="window.addExpense()" class="btn btn-primary mt-3">+ Ongeza Matumizi</button>' : ''}
+    </td></tr>`;
     document.getElementById('pagination').innerHTML = '';
     return;
   }
   
-  const start = (currentPage - 1) * pageSize;
-  const pageData = filteredExpenses.slice(start, start + pageSize);
-  const totalPages = Math.ceil(filteredExpenses.length / pageSize);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageData = filteredExpenses.slice(start, start + PAGE_SIZE);
   
-  const statusBadge = (s) => {
-    const map = { pending: 'badge-warning', approved: 'badge-success', rejected: 'badge-danger' };
-    const labels = { pending: 'Inasubiri', approved: 'Imeidhinishwa', rejected: 'Imekataliwa' };
-    return `<span class="badge ${map[s]}">${labels[s]}</span>`;
-  };
-  
-  const paymentLabels = {
-    cash: '💵 Cash', bank: '🏦 Bank', mobile_money: '📱 Mobile', cheque: '📝 Cheque'
-  };
-  
-  tbody.innerHTML = pageData.map(e => `
-    <tr>
-      <td>${formatDate(e.expense_date)}</td>
-      <td class="font-mono text-xs">${e.budget_item?.code || '-'}</td>
-      <td>${escapeHtml(e.description)}</td>
-      <td>${escapeHtml(e.supplier_name || e.supplier?.name || '-')}</td>
-      <td class="text-right font-bold">${formatTZS(e.amount)}</td>
-      <td class="text-xs">${paymentLabels[e.payment_method] || e.payment_method}</td>
-      <td>${statusBadge(e.status)}</td>
-      <td class="whitespace-nowrap">
-        <button class="text-green-600 hover:text-green-800 text-sm" onclick="window.viewExpense(${e.id})">👁</button>
-        ${e.status === 'pending' && hasPermission('expenses', 'approve') ? `
-          <button class="text-green-600 hover:text-green-800 text-sm ml-1" onclick="window.approveExpense(${e.id})" title="Idhinisha">✓</button>
-          <button class="text-red-600 hover:text-red-800 text-sm ml-1" onclick="window.rejectExpense(${e.id})" title="Kataa">✗</button>
-        ` : ''}
-        ${e.status === 'pending' && hasPermission('expenses', 'edit') ? `
-          <button class="text-green-600 hover:text-green-800 text-sm ml-1" onclick="window.editExpense(${e.id})">✏️</button>
-        ` : ''}
-        ${hasPermission('expenses', 'delete') ? `
-          <button class="text-red-600 hover:text-red-800 text-sm ml-1" onclick="window.deleteExpense(${e.id})">🗑</button>
-        ` : ''}
-      </td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = pageData.map(e => {
+    const statusBadge = {
+      pending: '<span class="badge badge-warning">⏳ Inasubiri</span>',
+      approved: '<span class="badge badge-success">✓ Imeidhinishwa</span>',
+      rejected: '<span class="badge badge-danger">✗ Imekataliwa</span>'
+    }[e.status] || e.status;
+    
+    return `
+      <tr>
+        <td class="whitespace-nowrap text-sm">${formatDate(e.expense_date)}</td>
+        <td class="text-sm">${e.plot ? `<span class="badge badge-info">${escapeHtml(e.plot.code)}</span>` : '-'}</td>
+        <td>
+          <div class="font-medium">${escapeHtml(e.description)}</div>
+          ${e.budget_item ? `<div class="text-xs text-gray-500">${escapeHtml(e.budget_item.code)} - ${escapeHtml(e.budget_item.item)}</div>` : ''}
+        </td>
+        <td class="text-sm">${escapeHtml(e.supplier_name || '-')}</td>
+        <td class="text-right money">${formatNumber(e.amount)}</td>
+        <td>${statusBadge}</td>
+        <td class="text-sm">${e.approver ? escapeHtml(e.approver.full_name) : '-'}</td>
+        <td>${e.receipt_url ? `<button class="text-blue-600 text-sm" onclick="window.viewReceipt('${e.receipt_url}')">📎 Risiti</button>` : '-'}</td>
+        <td class="whitespace-nowrap">
+          ${e.status === 'pending' && hasPermission('expenses', 'approve') ? `
+            <button class="text-green-600 text-sm" onclick="window.approveExpense(${e.id})" title="Idhinisha">✓</button>
+            <button class="text-red-600 text-sm ml-1" onclick="window.rejectExpense(${e.id})" title="Kataa">✗</button>
+          ` : ''}
+          ${hasPermission('expenses', 'edit') ? `<button class="text-blue-600 text-sm ml-1" onclick="window.editExpense(${e.id})" title="Hariri">✏️</button>` : ''}
+          ${hasPermission('expenses', 'delete') ? `<button class="text-red-700 text-sm ml-1" onclick="window.deleteExpense(${e.id})" title="Futa">🗑️</button>` : ''}
+        </td>
+      </tr>`;
+  }).join('');
   
   // Pagination
-  document.getElementById('pagination').innerHTML = `
-    <div class="text-sm text-gray-600">
-      Ukurasa ${currentPage} kati ya ${totalPages} (jumla ${filteredExpenses.length})
-    </div>
-    <div class="flex gap-2">
-      <button ${currentPage === 1 ? 'disabled' : ''} onclick="window.changePage(${currentPage - 1})" class="btn btn-secondary text-sm ${currentPage === 1 ? 'opacity-50' : ''}">← Mbele</button>
-      <button ${currentPage >= totalPages ? 'disabled' : ''} onclick="window.changePage(${currentPage + 1})" class="btn btn-secondary text-sm ${currentPage >= totalPages ? 'opacity-50' : ''}">Nyuma →</button>
-    </div>
-  `;
+  const totalPages = Math.ceil(filteredExpenses.length / PAGE_SIZE);
+  const pag = document.getElementById('pagination');
+  pag.innerHTML = `
+    <span>Inaonyesha ${start + 1}-${Math.min(start + PAGE_SIZE, filteredExpenses.length)} ya ${filteredExpenses.length}</span>
+    <div class="flex gap-1">
+      <button class="btn btn-secondary px-3 py-1 text-sm" ${currentPage === 1 ? 'disabled' : ''} onclick="window.expPrev()">← Nyuma</button>
+      <span class="px-3 py-1 text-sm">${currentPage} / ${totalPages}</span>
+      <button class="btn btn-secondary px-3 py-1 text-sm" ${currentPage >= totalPages ? 'disabled' : ''} onclick="window.expNext()">Mbele →</button>
+    </div>`;
 }
 
-// ============================================================================
-// EVENTS
-// ============================================================================
 function bindEvents() {
-  document.getElementById('filter-status').onchange = applyFilters;
-  document.getElementById('filter-from').onchange = applyFilters;
-  document.getElementById('filter-to').onchange = applyFilters;
-  document.getElementById('filter-search').oninput = debounce(applyFilters);
-  document.getElementById('add-btn').onclick = () => openModal();
-  document.getElementById('export-btn').onclick = (e) => exportData(e.currentTarget);
+  document.getElementById('add-expense-btn')?.addEventListener('click', () => openExpenseModal());
+  document.getElementById('filter-status')?.addEventListener('change', applyFilters);
+  document.getElementById('filter-plot')?.addEventListener('change', applyFilters);
+  document.getElementById('filter-from')?.addEventListener('change', applyFilters);
+  document.getElementById('filter-to')?.addEventListener('change', applyFilters);
+  document.getElementById('filter-search')?.addEventListener('input', debounce(applyFilters, 300));
+  document.getElementById('export-btn')?.addEventListener('click', (e) => exportExpenses(e.currentTarget));
+  document.getElementById('clear-filters')?.addEventListener('click', () => {
+    ['filter-status','filter-plot','filter-from','filter-to','filter-search'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    applyFilters();
+  });
   
-  // Window handlers
-  window.changePage = (p) => { currentPage = p; renderTable(); window.scrollTo(0, 0); };
-  window.viewExpense = (id) => viewDetails(id);
-  window.editExpense = (id) => openModal(allExpenses.find(e => e.id === id));
+  window.addExpense = () => openExpenseModal();
+  window.editExpense = (id) => openExpenseModal(allExpenses.find(e => e.id === id));
   window.approveExpense = (id) => updateStatus(id, 'approved');
   window.rejectExpense = (id) => promptReject(id);
   window.deleteExpense = async (id) => {
-    if (!await confirm('Una hakika unataka kufuta matumizi haya?')) return;
-    const { error } = await supabase.from('expenses').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+    if (!await confirm('Una uhakika unataka kufuta matumizi haya?')) return;
+    const { error } = await supabase.from('expenses').delete().eq('id', id);
     if (error) { toast(error.message, 'error'); return; }
-    toast('Yamefutwa', 'success');
+    await logAction('delete', 'expenses', 'Amefuta matumizi');
+    toast('Imefutwa', 'success');
     await loadExpenses();
   };
+  window.viewReceipt = async (url) => {
+    if (url.startsWith('http')) {
+      window.open(url, '_blank');
+    } else {
+      // Supabase storage
+      const { data } = await supabase.storage.from('receipts').createSignedUrl(url, 3600);
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+    }
+  };
+  window.expPrev = () => { if (currentPage > 1) { currentPage--; renderExpenses(); } };
+  window.expNext = () => { if (currentPage * PAGE_SIZE < filteredExpenses.length) { currentPage++; renderExpenses(); } };
 }
 
-// ============================================================================
-// MODAL (add/edit)
-// ============================================================================
-function openModal(expense = null) {
-  if (budgetItems.length === 0) {
-    toast('Tengeneza budget items kwanza', 'warning');
-    return;
-  }
+function openExpenseModal(expense = null) {
+  // Group budget items by category for select
+  const itemsByCategory = {};
+  budgetItems.forEach(b => {
+    const catName = b.budget_categories?.name || 'Other';
+    if (!itemsByCategory[catName]) itemsByCategory[catName] = [];
+    itemsByCategory[catName].push(b);
+  });
   
   const html = `
-    <form id="expense-form" class="space-y-4">
+    <form id="exp-form" class="space-y-4">
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="form-label">Tarehe</label>
+          <label class="form-label">Tarehe <span class="text-red-500">*</span></label>
           <input type="date" name="expense_date" required class="form-input" value="${expense?.expense_date || todayISO()}">
         </div>
         <div>
-          <label class="form-label">Kifungu cha Bajeti</label>
-          <select name="budget_item_id" required class="form-select">
-            <option value="">Chagua...</option>
-            ${budgetItems.map(b => `<option value="${b.id}" ${expense?.budget_item_id == b.id ? 'selected' : ''}>${b.code} - ${escapeHtml(b.item)}</option>`).join('')}
+          <label class="form-label">Shamba <span class="text-red-500">*</span></label>
+          <select name="plot_id" required class="form-select">
+            <option value="">-- Chagua Shamba --</option>
+            ${plots.map(p => `<option value="${p.id}" ${expense?.plot_id == p.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
           </select>
         </div>
       </div>
+      
       <div>
-        <label class="form-label">Maelezo</label>
-        <input type="text" name="description" required class="form-input" value="${escapeHtml(expense?.description || '')}" placeholder="Mfano: Diesel kwa trekta">
+        <label class="form-label">Aina ya Matumizi (Budget Item) <span class="text-red-500">*</span></label>
+        <select name="budget_item_id" required class="form-select">
+          <option value="">-- Chagua Kipengele cha Bajeti --</option>
+          ${Object.entries(itemsByCategory).map(([catName, items]) => `
+            <optgroup label="${escapeHtml(catName)}">
+              ${items.map(b => `<option value="${b.id}" ${expense?.budget_item_id == b.id ? 'selected' : ''}>${escapeHtml(b.code)} - ${escapeHtml(b.item)}</option>`).join('')}
+            </optgroup>
+          `).join('')}
+        </select>
+        <p class="text-xs text-gray-500 mt-1">Matumizi yatahesabiwa kwa kipengele hiki kwenye bajeti</p>
       </div>
-      <div class="grid grid-cols-3 gap-3">
-        <div>
-          <label class="form-label">Quantity</label>
-          <input type="number" step="0.01" name="quantity" class="form-input" value="${expense?.quantity || ''}">
-        </div>
-        <div>
-          <label class="form-label">Bei kwa Unit</label>
-          <input type="number" step="0.01" name="unit_price" class="form-input" value="${expense?.unit_price || ''}">
-        </div>
-        <div>
-          <label class="form-label">Jumla (TZS)</label>
-          <input type="number" step="0.01" name="amount" required class="form-input" value="${expense?.amount || ''}">
-        </div>
+      
+      <div>
+        <label class="form-label">Maelezo <span class="text-red-500">*</span></label>
+        <input type="text" name="description" required class="form-input" value="${expense?.description || ''}" placeholder="Mfano: Mafuta ya tractor, ununuzi wa mbegu, n.k.">
       </div>
+      
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="form-label">Supplier</label>
-          <input type="text" name="supplier_name" class="form-input" value="${escapeHtml(expense?.supplier_name || '')}" placeholder="Jina la mtoa huduma">
+          <label class="form-label">Kiasi (TZS) <span class="text-red-500">*</span></label>
+          <input type="number" step="0.01" name="amount" required class="form-input" value="${expense?.amount || ''}" placeholder="0">
         </div>
         <div>
-          <label class="form-label">Njia ya Malipo</label>
-          <select name="payment_method" required class="form-select">
-            <option value="cash" ${expense?.payment_method === 'cash' ? 'selected' : ''}>Cash</option>
-            <option value="bank" ${expense?.payment_method === 'bank' ? 'selected' : ''}>Bank</option>
-            <option value="mobile_money" ${expense?.payment_method === 'mobile_money' ? 'selected' : ''}>Mobile Money</option>
-            <option value="cheque" ${expense?.payment_method === 'cheque' ? 'selected' : ''}>Cheque</option>
-          </select>
+          <label class="form-label">Mtoa Bidhaa/Huduma</label>
+          <input type="text" name="supplier_name" class="form-input" value="${expense?.supplier_name || ''}" placeholder="Jina la duka au mtu">
         </div>
       </div>
-      <div>
-        <label class="form-label">Reference Number</label>
-        <input type="text" name="reference_number" class="form-input" value="${escapeHtml(expense?.reference_number || '')}" placeholder="Transaction ID, receipt #, n.k.">
+      
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label">Njia ya Malipo</label>
+          <select name="payment_method" class="form-select">
+            <option value="">-- Chagua --</option>
+            <option value="cash" ${expense?.payment_method === 'cash' ? 'selected' : ''}>💵 Cash</option>
+            <option value="mpesa" ${expense?.payment_method === 'mpesa' ? 'selected' : ''}>📱 M-Pesa</option>
+            <option value="tigo_pesa" ${expense?.payment_method === 'tigo_pesa' ? 'selected' : ''}>📱 Tigo Pesa</option>
+            <option value="airtel_money" ${expense?.payment_method === 'airtel_money' ? 'selected' : ''}>📱 Airtel Money</option>
+            <option value="bank" ${expense?.payment_method === 'bank' ? 'selected' : ''}>🏦 Bank Transfer</option>
+            <option value="cheque" ${expense?.payment_method === 'cheque' ? 'selected' : ''}>📄 Cheque</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Reference Number</label>
+          <input type="text" name="reference_number" class="form-input" value="${expense?.reference_number || ''}" placeholder="M-Pesa code, receipt #">
+        </div>
       </div>
+      
       <div>
-        <label class="form-label">Picha ya Risiti (hiari)</label>
+        <label class="form-label">Picha ya Risiti (Optional)</label>
         <input type="file" name="receipt" accept="image/*,application/pdf" class="form-input">
+        <p class="text-xs text-gray-500 mt-1">JPG, PNG, au PDF. Max 5MB.</p>
+        ${expense?.receipt_url ? `<p class="text-xs text-green-600 mt-1">✓ Risiti tayari ipo: <a href="#" onclick="window.viewReceipt('${expense.receipt_url}'); return false;" class="underline">Tazama</a></p>` : ''}
       </div>
-      <div class="flex justify-end gap-2 pt-4">
+      
+      <div class="flex justify-end gap-2 pt-2 border-t">
         <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
-        <button type="submit" class="btn btn-primary">Hifadhi</button>
+        <button type="submit" class="btn btn-primary">${expense ? 'Hifadhi' : 'Ongeza'}</button>
       </div>
-    </form>
-  `;
+    </form>`;
   
   const { overlay, close } = createModal(expense ? 'Hariri Matumizi' : 'Matumizi Mapya', html);
   overlay.querySelector('.modal-close-btn').onclick = close;
-  
-  // Auto-calculate amount when quantity/unit_price change
-  const form = overlay.querySelector('#expense-form');
-  const qtyInput = form.querySelector('[name="quantity"]');
-  const priceInput = form.querySelector('[name="unit_price"]');
-  const amountInput = form.querySelector('[name="amount"]');
-  const calcAmount = () => {
-    const q = parseFloat(qtyInput.value) || 0;
-    const p = parseFloat(priceInput.value) || 0;
-    if (q && p) amountInput.value = (q * p).toFixed(2);
-  };
-  qtyInput.oninput = calcAmount;
-  priceInput.oninput = calcAmount;
-  
-  form.onsubmit = async (e) => {
+  overlay.querySelector('#exp-form').onsubmit = async (e) => {
     e.preventDefault();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Inahifadhi...';
+    
     const fd = new FormData(e.target);
-    const profile = getCurrentProfile();
-    
-    const data = {
-      budget_item_id: parseInt(fd.get('budget_item_id')),
-      expense_date: fd.get('expense_date'),
-      description: fd.get('description'),
-      quantity: parseFloat(fd.get('quantity')) || null,
-      unit_price: parseFloat(fd.get('unit_price')) || null,
-      amount: parseFloat(fd.get('amount')),
-      supplier_name: fd.get('supplier_name'),
-      payment_method: fd.get('payment_method'),
-      reference_number: fd.get('reference_number'),
-      recorded_by: profile.id
-    };
-    
-    let expenseId;
-    if (expense) {
-      const { error } = await supabase.from('expenses').update(data).eq('id', expense.id);
-      if (error) { toast(error.message, 'error'); return; }
-      expenseId = expense.id;
-    } else {
-      const { data: inserted, error } = await supabase.from('expenses').insert(data).select().single();
-      if (error) { toast(error.message, 'error'); return; }
-      expenseId = inserted.id;
-    }
-    
-    // Upload receipt if provided
     const file = fd.get('receipt');
-    if (file && file.size > 0) {
-      const path = `expenses/${expenseId}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage.from('receipts').upload(path, file);
-      if (!uploadError) {
-        await supabase.from('expense_attachments').insert({
-          expense_id: expenseId,
-          file_path: path,
-          file_name: file.name,
-          file_type: file.type,
-          file_size: file.size,
-          uploaded_by: profile.id
-        });
-      } else {
-        toast('Receipt upload failed: ' + uploadError.message, 'warning');
-      }
-    }
+    let receipt_url = expense?.receipt_url || null;
     
-    toast(expense ? 'Yamebadilishwa' : 'Yameongezwa', 'success');
-    close();
-    await loadExpenses();
+    try {
+      // Upload receipt if provided
+      if (file && file.size > 0) {
+        const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g,'_')}`;
+        const { error: uploadErr } = await supabase.storage.from('receipts').upload(fileName, file);
+        if (uploadErr) {
+          if (uploadErr.message.includes('Bucket not found')) {
+            toast('Tafadhali tengeneza bucket "receipts" kwenye Supabase', 'error');
+            throw uploadErr;
+          }
+          throw uploadErr;
+        }
+        receipt_url = fileName;
+      }
+      
+      const data = {
+        expense_date: fd.get('expense_date'),
+        plot_id: parseInt(fd.get('plot_id')),
+        budget_item_id: parseInt(fd.get('budget_item_id')),
+        description: fd.get('description'),
+        amount: parseFloat(fd.get('amount')),
+        supplier_name: fd.get('supplier_name') || null,
+        payment_method: fd.get('payment_method') || null,
+        reference_number: fd.get('reference_number') || null,
+        receipt_url
+      };
+      if (!expense) data.created_by = getCurrentProfile()?.id;
+      
+      let err;
+      if (expense) ({ error: err } = await supabase.from('expenses').update(data).eq('id', expense.id));
+      else ({ error: err } = await supabase.from('expenses').insert(data));
+      if (err) throw err;
+      
+      await logAction(expense ? 'update' : 'create', 'expenses', `${expense ? 'Amebadilisha' : 'Ameingiza'} matumizi: ${data.description} - TZS ${data.amount.toLocaleString()}`);
+      toast(expense ? 'Imebadilishwa' : 'Imeongezwa', 'success');
+      close();
+      await loadExpenses();
+    } catch (err) {
+      toast(err.message || 'Imeshindikana', 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = expense ? 'Hifadhi' : 'Ongeza';
+    }
   };
 }
 
-// ============================================================================
-// APPROVAL / REJECTION
-// ============================================================================
 async function updateStatus(id, status, reason = null) {
   const profile = getCurrentProfile();
-  const updates = {
-    status,
-    approved_by: profile.id,
-    approved_at: new Date().toISOString()
-  };
+  const updates = { status, approved_by: profile.id, approved_at: new Date().toISOString() };
   if (reason) updates.rejection_reason = reason;
   
   const { error } = await supabase.from('expenses').update(updates).eq('id', id);
   if (error) { toast(error.message, 'error'); return; }
   
   const expense = allExpenses.find(e => e.id === id);
-  const desc = `${status === 'approved' ? 'Ameidhinisha' : 'Amekataa'} matumizi: ${expense?.description || `#${id}`} (TZS ${Number(expense?.amount || 0).toLocaleString()})${reason ? ' - ' + reason : ''}`;
-  await logAction(supabase, status === 'approved' ? 'approve' : 'reject', 'expenses', { type: 'expense', id }, desc);
-  
+  await logAction(status === 'approved' ? 'approve' : 'reject', 'expenses', `${status === 'approved' ? 'Ameidhinisha' : 'Amekataa'}: ${expense?.description} - TZS ${Number(expense?.amount || 0).toLocaleString()}${reason ? ' (' + reason + ')' : ''}`);
   toast(status === 'approved' ? 'Yameidhinishwa' : 'Yamekataliwa', 'success');
   await loadExpenses();
 }
 
 function promptReject(id) {
   const html = `
-    <form id="reject-form" class="space-y-4">
-      <p class="text-gray-600">Toa sababu ya kukataa:</p>
+    <form id="reject-form" class="space-y-3">
+      <p class="text-sm">Eleza sababu ya kukataa matumizi haya:</p>
       <textarea name="reason" required class="form-textarea" rows="3" placeholder="Sababu..."></textarea>
       <div class="flex justify-end gap-2">
         <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
         <button type="submit" class="btn btn-danger">Kataa</button>
       </div>
-    </form>
-  `;
-  const { overlay, close } = createModal('Kataa Matumizi', html);
+    </form>`;
+  const { overlay, close } = createModal('Kataa Matumizi', html, 'max-w-md');
   overlay.querySelector('.modal-close-btn').onclick = close;
   overlay.querySelector('#reject-form').onsubmit = async (e) => {
     e.preventDefault();
-    const reason = new FormData(e.target).get('reason');
-    await updateStatus(id, 'rejected', reason);
+    await updateStatus(id, 'rejected', new FormData(e.target).get('reason'));
     close();
   };
 }
 
-// ============================================================================
-// VIEW DETAILS
-// ============================================================================
-async function viewDetails(id) {
-  const exp = allExpenses.find(e => e.id === id);
-  if (!exp) return;
-  
-  // Load attachments
-  const { data: attachments } = await supabase
-    .from('expense_attachments')
-    .select('*')
-    .eq('expense_id', id);
-  
-  const html = `
-    <div class="space-y-3">
-      <div class="grid grid-cols-2 gap-3 text-sm">
-        <div><strong>Tarehe:</strong> ${formatDate(exp.expense_date)}</div>
-        <div><strong>Kiasi:</strong> ${formatTZS(exp.amount)}</div>
-        <div><strong>Kifungu:</strong> ${exp.budget_item?.code} - ${escapeHtml(exp.budget_item?.item || '')}</div>
-        <div><strong>Status:</strong> ${exp.status}</div>
-        <div><strong>Supplier:</strong> ${escapeHtml(exp.supplier_name || '-')}</div>
-        <div><strong>Malipo:</strong> ${exp.payment_method}</div>
-        <div><strong>Ref:</strong> ${escapeHtml(exp.reference_number || '-')}</div>
-        <div><strong>Aliyeingiza:</strong> ${escapeHtml(exp.recorder?.full_name || '-')}</div>
-      </div>
-      <div>
-        <strong>Maelezo:</strong>
-        <p class="mt-1 text-gray-700">${escapeHtml(exp.description)}</p>
-      </div>
-      ${exp.rejection_reason ? `<div class="bg-red-50 p-3 rounded"><strong>Sababu ya kukataa:</strong> ${escapeHtml(exp.rejection_reason)}</div>` : ''}
-      ${attachments && attachments.length > 0 ? `
-        <div>
-          <strong>Risiti:</strong>
-          <div class="space-y-1 mt-2">
-            ${await Promise.all(attachments.map(async a => {
-              const { data } = await supabase.storage.from('receipts').createSignedUrl(a.file_path, 3600);
-              return `<a href="${data?.signedUrl || '#'}" target="_blank" class="block text-green-600 hover:text-green-800 text-sm">📎 ${escapeHtml(a.file_name)}</a>`;
-            })).then(a => a.join(''))}
-          </div>
-        </div>
-      ` : ''}
-    </div>
-  `;
-  createModal('Maelezo Kamili', html);
-}
-
-// ============================================================================
-// EXPORT
-// ============================================================================
-function exportData(btnEl) {
-  exportMenu(btnEl, filteredExpenses, `expenses-${todayISO()}`, [
+function exportExpenses(btnEl) {
+  exportMenu(btnEl, filteredExpenses, `matumizi-${todayISO()}`, [
     { key: 'expense_date', label: 'Tarehe', value: e => formatDate(e.expense_date) },
+    { label: 'Shamba', value: e => e.plot?.name || '' },
     { label: 'Code', value: e => e.budget_item?.code || '' },
-    { label: 'Item', value: e => e.budget_item?.item || '' },
+    { label: 'Kipengele', value: e => e.budget_item?.item || '' },
     { key: 'description', label: 'Maelezo' },
-    { key: 'supplier_name', label: 'Supplier' },
-    { key: 'amount', label: 'Kiasi (TZS)', value: e => Number(e.amount).toLocaleString() },
-    { key: 'payment_method', label: 'Malipo' },
-    { key: 'reference_number', label: 'Ref' },
-    { key: 'status', label: 'Status' }
+    { key: 'supplier_name', label: 'Mtoa Bidhaa' },
+    { key: 'amount', label: 'Kiasi (TZS)', value: e => formatNumber(e.amount) },
+    { key: 'payment_method', label: 'Njia ya Malipo' },
+    { key: 'reference_number', label: 'Reference' },
+    { key: 'status', label: 'Status' },
+    { label: 'Aliyeidhinisha', value: e => e.approver?.full_name || '' }
   ], { title: 'Ripoti ya Matumizi', orientation: 'landscape' });
 }

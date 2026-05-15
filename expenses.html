@@ -7,98 +7,82 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="bg-green-50">
+<body>
   <div id="sidebar-container"></div>
   <main class="lg:ml-64 min-h-screen">
     <div id="topbar-container"></div>
-    <div class="p-6 space-y-6">
+    <div class="p-4 lg:p-6 space-y-4">
       
-      <!-- Filters + actions -->
+      <!-- Stats -->
+      <div id="expense-stats"></div>
+      
+      <!-- Filters & Actions -->
       <div class="card">
-        <div class="flex flex-wrap items-end justify-between gap-3">
-          <div class="flex flex-wrap gap-3">
-            <div>
-              <label class="form-label">Status</label>
-              <select id="filter-status" class="form-select" style="width:auto;min-width:140px">
-                <option value="">Zote</option>
-                <option value="pending">Inasubiri</option>
-                <option value="approved">Imeidhinishwa</option>
-                <option value="rejected">Imekataliwa</option>
-              </select>
-            </div>
-            <div>
-              <label class="form-label">Tangu</label>
-              <input type="date" id="filter-from" class="form-input" style="width:auto">
-            </div>
-            <div>
-              <label class="form-label">Hadi</label>
-              <input type="date" id="filter-to" class="form-input" style="width:auto">
-            </div>
-            <div>
-              <label class="form-label">Tafuta</label>
-              <input type="text" id="filter-search" class="form-input" placeholder="Search..." style="width:auto;min-width:200px">
-            </div>
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex-1 min-w-[180px]">
+            <label class="form-label">🔍 Tafuta</label>
+            <input type="search" id="filter-search" class="form-input" placeholder="Maelezo, supplier...">
           </div>
-          <div class="flex gap-2">
-            <button id="export-btn" class="btn btn-secondary">📥 Export</button>
-            <button id="add-btn" class="btn btn-primary">+ Matumizi Mapya</button>
+          <div>
+            <label class="form-label">Status</label>
+            <select id="filter-status" class="form-select">
+              <option value="">Zote</option>
+              <option value="pending">⏳ Inasubiri</option>
+              <option value="approved">✓ Imeidhinishwa</option>
+              <option value="rejected">✗ Imekataliwa</option>
+            </select>
           </div>
+          <div>
+            <label class="form-label">Shamba</label>
+            <select id="filter-plot" class="form-select"></select>
+          </div>
+          <div>
+            <label class="form-label">Tangu</label>
+            <input type="date" id="filter-from" class="form-input">
+          </div>
+          <div>
+            <label class="form-label">Mpaka</label>
+            <input type="date" id="filter-to" class="form-input">
+          </div>
+          <button id="clear-filters" class="btn btn-secondary">✕ Futa</button>
+          <button id="export-btn" class="btn btn-secondary">📥 Export</button>
+          <button id="add-expense-btn" class="btn btn-primary">+ Matumizi Mapya</button>
         </div>
       </div>
       
-      <!-- Summary stats -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="stat-card">
-          <div class="stat-label">Jumla ya Matumizi</div>
-          <div class="stat-value" id="sum-total">-</div>
-        </div>
-        <div class="stat-card" style="border-color: #F59E0B;">
-          <div class="stat-label">Yanasubiri</div>
-          <div class="stat-value" id="sum-pending">-</div>
-        </div>
-        <div class="stat-card" style="border-color: #22C55E;">
-          <div class="stat-label">Yameidhinishwa</div>
-          <div class="stat-value" id="sum-approved">-</div>
-        </div>
-        <div class="stat-card" style="border-color: #EF4444;">
-          <div class="stat-label">Yamekataliwa</div>
-          <div class="stat-value" id="sum-rejected">-</div>
-        </div>
-      </div>
-      
-      <!-- Expenses table -->
-      <div class="card overflow-x-auto">
+      <!-- Table -->
+      <div class="card p-0 overflow-x-auto">
         <table class="data-table">
           <thead>
             <tr>
               <th>Tarehe</th>
-              <th>Kifungu</th>
-              <th>Maelezo</th>
+              <th>Shamba</th>
+              <th>Maelezo / Kipengele</th>
               <th>Supplier</th>
-              <th class="text-right">Kiasi</th>
-              <th>Malipo</th>
+              <th class="text-right">Kiasi (TZS)</th>
               <th>Status</th>
-              <th>Vitendo</th>
+              <th>Aliyeidhinisha</th>
+              <th>Risiti</th>
+              <th>Hatua</th>
             </tr>
           </thead>
           <tbody id="expenses-tbody">
-            <tr><td colspan="8" class="text-center text-gray-500 py-8">Inapakia...</td></tr>
+            <tr><td colspan="9" class="text-center text-gray-500 py-8">Inapakia...</td></tr>
           </tbody>
         </table>
-        
-        <div id="pagination" class="flex justify-between items-center mt-4 pt-4 border-t border-green-100"></div>
+        <div id="pagination" class="flex justify-between items-center p-4 text-sm text-gray-600 border-t border-green-100"></div>
       </div>
       
     </div>
   </main>
   
   <script type="module">
-    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { requireBusinessUser, requirePermission } from './js/auth.js';
     import { initLayout } from './js/layout.js';
     import { initExpenses } from './js/pages/expenses.js';
     
     await requireBusinessUser();
-    if (!requirePermission('expenses', 'view')) throw new Error('No permission');
+    if (!requirePermission('expenses', 'view')) {}
     initLayout('Matumizi');
     await initExpenses();
   </script>

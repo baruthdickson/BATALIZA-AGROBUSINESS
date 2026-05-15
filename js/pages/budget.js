@@ -164,7 +164,28 @@ function renderSummary() {
   const pct = totalPlanned > 0 ? (totalActual / totalPlanned * 100) : 0;
   const el = document.getElementById('budget-summary');
   if (!el) return;
-  el.innerHTML = `
+  
+  // 80% warning banner
+  let warningHtml = '';
+  if (pct >= 100) {
+    warningHtml = `<div class="warning-banner danger mb-4">
+      <div class="text-3xl">🚨</div>
+      <div class="flex-1">
+        <div class="font-bold text-red-900">UMEZIDI BAJETI!</div>
+        <div class="text-sm text-red-800">Umetumia ${formatTZS(totalActual - totalPlanned)} zaidi ya bajeti uliyopanga (${pct.toFixed(1)}%)</div>
+      </div>
+    </div>`;
+  } else if (pct >= 80) {
+    warningHtml = `<div class="warning-banner mb-4">
+      <div class="text-3xl">⚠️</div>
+      <div class="flex-1">
+        <div class="font-bold text-yellow-900">Onyo: Umetumia ${pct.toFixed(1)}% ya bajeti</div>
+        <div class="text-sm text-yellow-800">Bado una ${formatTZS(remaining)} kabla ya kuzidi bajeti. Tahadhari na matumizi yajayo.</div>
+      </div>
+    </div>`;
+  }
+  
+  el.innerHTML = warningHtml + `
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="stat-card"><div class="stat-label">Bajeti Jumla</div><div class="stat-value money">${formatTZS(totalPlanned)}</div><div class="stat-sub">${categories.length} shughuli · ${allItems.filter(i => i.item_type === 'leaf').length} vipengele</div></div>
       <div class="stat-card blue"><div class="stat-label">Matumizi Halisi</div><div class="stat-value money">${formatTZS(totalActual)}</div><div class="stat-sub">${pct.toFixed(1)}% ya bajeti</div></div>
