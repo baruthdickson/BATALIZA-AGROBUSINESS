@@ -121,32 +121,43 @@ function renderRoles() {
 function openUserModal(user = null) {
   const html = `
     <form id="user-form" class="space-y-3">
-      <div>
-        <label class="form-label">Jina Kamili</label>
-        <input type="text" name="full_name" required class="form-input" value="${escapeHtml(user?.full_name || '')}">
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="form-label">Jina la Kwanza <span class="text-red-500">*</span></label>
+          <input type="text" name="first_name" required class="form-input" value="${escapeHtml(user?.first_name || '')}" placeholder="John">
+        </div>
+        <div>
+          <label class="form-label">Jina la Kati</label>
+          <input type="text" name="middle_name" class="form-input" value="${escapeHtml(user?.middle_name || '')}" placeholder="Peter">
+        </div>
+        <div>
+          <label class="form-label">Jina la Mwisho <span class="text-red-500">*</span></label>
+          <input type="text" name="last_name" required class="form-input" value="${escapeHtml(user?.last_name || '')}" placeholder="Doe">
+        </div>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="form-label">Email</label>
-          <input type="email" name="email" required class="form-input" value="${escapeHtml(user?.email || '')}" ${user ? 'readonly' : ''}>
+          <label class="form-label">Email <span class="text-red-500">*</span></label>
+          <input type="email" name="email" required class="form-input" value="${escapeHtml(user?.email || '')}" ${user ? 'readonly' : ''} placeholder="muhasibu@example.com">
         </div>
         <div>
-          <label class="form-label">Simu</label>
-          <input type="tel" name="phone" class="form-input" value="${escapeHtml(user?.phone || '')}">
+          <label class="form-label">Namba ya Simu <span class="text-red-500">*</span></label>
+          <input type="tel" name="phone" required class="form-input" value="${escapeHtml(user?.phone || '')}" placeholder="+255712345678">
         </div>
       </div>
       ${!user ? `
         <div>
-          <label class="form-label">Password ya Awali</label>
-          <input type="password" name="password" required class="form-input" minlength="6">
+          <label class="form-label">Password ya Awali <span class="text-red-500">*</span></label>
+          <input type="password" name="password" required class="form-input" minlength="6" placeholder="Minimum characters 6">
           <p class="text-xs text-gray-500 mt-1">Mtumiaji anaweza kubadilisha baadaye</p>
         </div>
       ` : ''}
       <div>
-        <label class="form-label">Role</label>
+        <label class="form-label">Aina ya Mtumiaji (Role) <span class="text-red-500">*</span></label>
         <select name="role_id" required class="form-select">
           ${roles.filter(r => !r.is_hidden).map(r => `<option value="${r.id}" ${user?.role_id == r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
         </select>
+        <p class="text-xs text-gray-500 mt-1">💡 <strong>Muhasibu (Accountant)</strong>: Anaomba pesa na kuingiza matumizi</p>
       </div>
       ${user ? `
         <div>
@@ -158,7 +169,7 @@ function openUserModal(user = null) {
       ` : ''}
       <div class="flex justify-end gap-2 pt-3">
         <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
-        <button type="submit" class="btn btn-primary">Hifadhi</button>
+        <button type="submit" class="btn btn-primary">${user ? 'Hifadhi' : 'Tengeneza Akaunti'}</button>
       </div>
     </form>
   `;
@@ -168,30 +179,44 @@ function openUserModal(user = null) {
   overlay.querySelector('#user-form').onsubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const firstName = fd.get('first_name')?.trim() || '';
+    const middleName = fd.get('middle_name')?.trim() || '';
+    const lastName = fd.get('last_name')?.trim() || '';
+    const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
     
     try {
       if (user) {
         // Update existing
-        const { error } = await supabase.from('users').update({
-          full_name: fd.get('full_name'),
+        const updates = {
+          full_name: fullName,
+          first_name: firstName,
+          middle_name: middleName || null,
+          last_name: lastName,
           phone: fd.get('phone'),
           role_id: parseInt(fd.get('role_id')),
           is_active: fd.get('is_active') === 'on'
-        }).eq('id', user.id);
+        };
+        let { error } = await supabase.from('users').update(updates).eq('id', user.id);
+        // Smart retry kama columns hazipo
+        if (error) {
+          const safe = { full_name: fullName, phone: fd.get('phone'), role_id: parseInt(fd.get('role_id')), is_active: fd.get('is_active') === 'on' };
+          ({ error } = await supabase.from('users').update(safe).eq('id', user.id));
+        }
         if (error) throw error;
-        await logAction(supabase, 'update', 'users', { type: 'user', id: user.id }, `Amebadilisha mtumiaji: ${fd.get('full_name')}`);
+        await logAction(supabase, 'update', 'users', { type: 'user', id: user.id }, `Amebadilisha mtumiaji: ${fullName}`);
         toast('Mtumiaji amebadilishwa', 'success');
       } else {
         // Create new
         const newUser = await createUser(
           fd.get('email'),
           fd.get('password'),
-          fd.get('full_name'),
+          fullName,
           parseInt(fd.get('role_id')),
-          fd.get('phone')
+          fd.get('phone'),
+          { first_name: firstName, middle_name: middleName, last_name: lastName }
         );
-        await logAction(supabase, 'create', 'users', { type: 'user', id: newUser?.id }, `Ametengeneza mtumiaji: ${fd.get('full_name')} (${fd.get('email')})`);
-        toast('Mtumiaji amesajiliwa! Anaweza kuingia sasa.', 'success');
+        await logAction(supabase, 'create', 'users', { type: 'user', id: newUser?.id }, `Ametengeneza mtumiaji: ${fullName} (${fd.get('email')})`);
+        toast('Akaunti imetengenezwa! Mtumiaji anaweza kuingia sasa.', 'success');
       }
       close();
       await loadUsers();

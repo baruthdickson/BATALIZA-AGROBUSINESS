@@ -158,25 +158,19 @@ export function isPM() {
 // CREATE NEW USER (PM/Admin only)
 // Tunatumia separate Supabase client kuepuka kulogout admin
 // ============================================================================
-export async function createUser(email, password, fullName, roleId, phone = null) {
+export async function createUser(email, password, fullName, roleId, phone = null, names = {}) {
   // Hifadhi session ya admin kabla ya kufanya signUp
   const { data: { session: adminSession } } = await supabase.auth.getSession();
   if (!adminSession) throw new Error('Hujaingia kwenye mfumo');
   
-  // Tengeneza Supabase client mpya (bila storage) kwa ajili ya signUp tu
-  // Hii inazuia signUp kubadilisha session ya admin kwenye localStorage
   const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
   const { SUPABASE_URL, SUPABASE_ANON_KEY } = await import('./config.js');
   
   const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
-    }
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
   
-  // 1. Tengeneza auth user kupitia signUp (kwenye temp client)
+  // 1. Tengeneza auth user
   const { data: signupData, error: signupError } = await tempClient.auth.signUp({
     email: email.trim().toLowerCase(),
     password,
@@ -186,21 +180,41 @@ export async function createUser(email, password, fullName, roleId, phone = null
   if (signupError) throw signupError;
   if (!signupData.user) throw new Error('User haikutengenezwa');
   
-  // 2. Tengeneza profile kwenye public.users (kwa kutumia admin session)
-  const { error: profileError } = await supabase.from('users').insert({
+  // 2. Tengeneza profile - jaribu na 3 names
+  const profileData = {
     id: signupData.user.id,
     username: email.split('@')[0],
     email: email.trim().toLowerCase(),
     full_name: fullName,
+    first_name: names.first_name || null,
+    middle_name: names.middle_name || null,
+    last_name: names.last_name || null,
     role_id: roleId,
     phone: phone || null,
     is_active: true,
     is_system_admin: false,
     created_by: currentUser?.id
-  });
+  };
+  
+  let { error: profileError } = await supabase.from('users').insert(profileData);
+  
+  // Smart retry kama columns za 3 names hazipo
+  if (profileError) {
+    const fallback = {
+      id: signupData.user.id,
+      username: email.split('@')[0],
+      email: email.trim().toLowerCase(),
+      full_name: fullName,
+      role_id: roleId,
+      phone: phone || null,
+      is_active: true,
+      is_system_admin: false,
+      created_by: currentUser?.id
+    };
+    ({ error: profileError } = await supabase.from('users').insert(fallback));
+  }
   
   if (profileError) {
-    // Profile imeshindikana — toa warning lakini auth user tayari yupo
     console.error('Profile creation error:', profileError);
     throw new Error('Auth user imeundwa lakini profile haijaundwa: ' + profileError.message);
   }

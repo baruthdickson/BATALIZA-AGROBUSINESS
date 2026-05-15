@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://cdn.tailwindcss.com">
+  <link rel="preconnect" href="https://esm.sh">
+  <link rel="preconnect" href="https://whexrklnrkigfqpdfzbt.supabase.co">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maombi ya Pesa - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-4 lg:p-6 space-y-4">
+      
+      <!-- Stats -->
+      <div id="request-stats"></div>
+      
+      <!-- Filters & Actions -->
+      <div class="card">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex-1 min-w-[180px]">
+            <label class="form-label">🔍 Tafuta</label>
+            <input type="search" id="filter-search" class="form-input" placeholder="Number, purpose, supplier...">
+          </div>
+          <div>
+            <label class="form-label">Status</label>
+            <select id="filter-status" class="form-select">
+              <option value="">Zote</option>
+              <option value="pending">⏳ Inasubiri</option>
+              <option value="approved">✓ Imeidhinishwa</option>
+              <option value="rejected">✗ Imekataliwa</option>
+              <option value="completed">📋 Imekamilika</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Shamba</label>
+            <select id="filter-plot" class="form-select"></select>
+          </div>
+          <button id="clear-filters" class="btn btn-secondary">✕ Futa</button>
+          <button id="export-btn" class="btn btn-secondary">📥 Export</button>
+          <button id="add-request-btn" class="btn btn-primary">+ Ombi Jipya</button>
+        </div>
+      </div>
+      
+      <!-- Table -->
+      <div class="card p-0 overflow-x-auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Number</th>
+              <th>Tarehe</th>
+              <th>Shamba</th>
+              <th>Kusudi</th>
+              <th class="text-right">Kiasi (TZS)</th>
+              <th>Status</th>
+              <th>Risiti</th>
+              <th>Hatua</th>
+            </tr>
+          </thead>
+          <tbody id="requests-tbody">
+            <tr><td colspan="8" class="text-center text-gray-500 py-8">Inapakia...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      
+    </div>
+  </main>
+  
+  <!-- jsPDF kwa receipt generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <script type="module">
+    import { requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initExpenseRequests } from './js/pages/expense-requests.js';
+    
+    await requireBusinessUser();
+    initLayout('Maombi ya Pesa');
+    await initExpenseRequests();
+  </script>
+</body>
+</html>
