@@ -341,17 +341,34 @@ function openExpenseModal(expense = null) {
       };
       if (!expense) {
         const profile = getCurrentProfile();
-        if (profile?.id) data.created_by = profile.id;
+        if (profile?.id) {
+          // Set all possible "who created this" columns
+          data.created_by = profile.id;
+          data.recorded_by = profile.id;
+          data.user_id = profile.id;
+        }
       }
       
       let err;
       if (expense) ({ error: err } = await supabase.from('expenses').update(data).eq('id', expense.id));
       else {
         let result = await supabase.from('expenses').insert(data);
-        // Retry bila created_by kama column haipo (schema cache issue)
-        if (result.error && result.error.message.includes('created_by')) {
-          delete data.created_by;
-          result = await supabase.from('expenses').insert(data);
+        // Smart retry: ondoa columns ambazo schema hazikubali
+        let retryCount = 0;
+        while (result.error && retryCount < 5) {
+          const msg = result.error.message;
+          // Find which column is causing the error
+          const colMatch = msg.match(/column "([^"]+)"/);
+          if (colMatch) {
+            const badCol = colMatch[1];
+            if (data[badCol] !== undefined) {
+              delete data[badCol];
+              retryCount++;
+              result = await supabase.from('expenses').insert(data);
+              continue;
+            }
+          }
+          break;
         }
         err = result.error;
       }
