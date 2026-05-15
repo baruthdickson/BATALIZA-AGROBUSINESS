@@ -110,8 +110,12 @@ async function loadExpenses() {
 }
 
 async function enrichExpensesClientSide() {
-  // Enrich approver
-  const approverIds = [...new Set(allExpenses.map(e => e.approved_by).filter(id => id && !e.approver))];
+  // Enrich approver - first filter expenses missing approver, then get unique IDs
+  const approverIds = [...new Set(
+    allExpenses
+      .filter(e => e.approved_by && !e.approver)
+      .map(e => e.approved_by)
+  )];
   if (approverIds.length > 0) {
     const { data: users } = await supabase.from('users').select('id, full_name').in('id', approverIds);
     const userMap = {};
@@ -123,8 +127,7 @@ async function enrichExpensesClientSide() {
     });
   }
   
-  // Enrich plot
-  const plotIds = [...new Set(allExpenses.map(e => e.plot_id).filter(id => id && !plots.find(p => p.id === id)))];
+  // Enrich plot from already-loaded plots array
   allExpenses.forEach(e => {
     if (e.plot_id && !e.plot) {
       const p = plots.find(plot => plot.id === e.plot_id);
@@ -133,19 +136,20 @@ async function enrichExpensesClientSide() {
   });
   
   // Enrich budget_item
-  const itemIds = [...new Set(allExpenses.map(e => e.budget_item_id).filter(Boolean))];
-  if (itemIds.length > 0) {
-    const missingIds = itemIds.filter(id => !allExpenses.find(e => e.budget_item_id === id && e.budget_item));
-    if (missingIds.length > 0) {
-      const { data: items } = await supabase.from('budget_items').select('id, code, item').in('id', missingIds);
-      const itemMap = {};
-      (items || []).forEach(i => itemMap[i.id] = i);
-      allExpenses.forEach(e => {
-        if (e.budget_item_id && itemMap[e.budget_item_id] && !e.budget_item) {
-          e.budget_item = { code: itemMap[e.budget_item_id].code, item: itemMap[e.budget_item_id].item };
-        }
-      });
-    }
+  const missingItemIds = [...new Set(
+    allExpenses
+      .filter(e => e.budget_item_id && !e.budget_item)
+      .map(e => e.budget_item_id)
+  )];
+  if (missingItemIds.length > 0) {
+    const { data: items } = await supabase.from('budget_items').select('id, code, item').in('id', missingItemIds);
+    const itemMap = {};
+    (items || []).forEach(i => itemMap[i.id] = i);
+    allExpenses.forEach(e => {
+      if (e.budget_item_id && itemMap[e.budget_item_id] && !e.budget_item) {
+        e.budget_item = { code: itemMap[e.budget_item_id].code, item: itemMap[e.budget_item_id].item };
+      }
+    });
   }
 }
 
