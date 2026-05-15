@@ -1,285 +1,340 @@
 // ============================================================================
-// REPORTS MODULE
+// REPORTS - Budget vs Actual + Expenses summaries
 // ============================================================================
-
 import { supabase } from '../supabase.js';
-import { formatTZS, formatDate, formatNumber, todayISO, toast, exportToCSV, exportMenu, escapeHtml } from '../utils.js';
-import { COLORS } from '../config.js';
+import { formatTZS, formatNumber, formatDate, todayISO, toast, exportMenu, escapeHtml } from '../utils.js';
 
 let currentReport = null;
 let currentData = [];
-let currentChart = null;
 
 export async function initReports() {
-  document.querySelectorAll('.report-btn').forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll('.report-btn').forEach(b => {
-        b.classList.remove('btn-primary');
-        b.classList.add('btn-secondary');
-      });
-      btn.classList.remove('btn-secondary');
-      btn.classList.add('btn-primary');
-      currentReport = btn.dataset.report;
-    };
-  });
-  
-  document.getElementById('generate-btn').onclick = generate;
-  document.getElementById('export-report-btn').onclick = (e) => {
-    if (!currentData.length) { toast('Tengeneza ripoti kwanza', 'warning'); return; }
-    exportCurrent(e.currentTarget);
-  };
+  bindEvents();
+  // Default report
+  selectReport('budget_vs_actual');
 }
 
+function bindEvents() {
+  document.querySelectorAll('.report-btn').forEach(btn => {
+    btn.onclick = () => selectReport(btn.dataset.report);
+  });
+  document.getElementById('generate-btn')?.addEventListener('click', generate);
+  document.getElementById('export-btn')?.addEventListener('click', (e) => {
+    if (!currentData.length) { toast('Tengeneza ripoti kwanza', 'warning'); return; }
+    exportCurrent(e.currentTarget);
+  });
+  // Set default dates
+  const fromInp = document.getElementById('date-from');
+  const toInp = document.getElementById('date-to');
+  if (fromInp && !fromInp.value) {
+    const d = new Date(); d.setMonth(d.getMonth() - 1);
+    fromInp.value = d.toISOString().split('T')[0];
+  }
+  if (toInp && !toInp.value) toInp.value = todayISO();
+}
+
+function selectReport(type) {
+  currentReport = type;
+  document.querySelectorAll('.report-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.report === type);
+  });
+  document.getElementById('report-title').textContent = REPORT_TITLES[type] || type;
+  document.getElementById('date-filters').style.display = ['expenses_by_date', 'expenses_by_plot'].includes(type) ? '' : 'none';
+  document.getElementById('report-output').innerHTML = '<div class="text-center text-gray-500 py-12">Bofya "Tengeneza" kuona data</div>';
+  currentData = [];
+}
+
+const REPORT_TITLES = {
+  budget_vs_actual: '📊 Bajeti dhidi ya Matumizi Halisi',
+  expenses_by_date: '🧾 Matumizi kwa Tarehe',
+  expenses_by_plot: '🏞️ Matumizi kwa Shamba',
+  budget_summary: '💵 Muhtasari wa Bajeti'
+};
+
 async function generate() {
-  if (!currentReport) { toast('Chagua aina ya ripoti', 'warning'); return; }
-  if (currentChart) { currentChart.destroy(); currentChart = null; }
+  if (!currentReport) { toast('Chagua ripoti', 'warning'); return; }
+  document.getElementById('report-output').innerHTML = '<div class="text-center py-12"><div class="animate-spin inline-block w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full"></div><div class="mt-2 text-gray-600">Inazalisha ripoti...</div></div>';
   
-  const from = document.getElementById('report-from').value;
-  const to = document.getElementById('report-to').value;
-  const container = document.getElementById('report-container');
-  container.innerHTML = '<div class="text-center py-8 text-gray-500">Inatengeneza...</div>';
-  
-  switch (currentReport) {
-    case 'budget': return await reportBudget(container);
-    case 'expenses': return await reportExpenses(container, from, to);
-    case 'field': return await reportField(container);
-    case 'payroll': return await reportPayroll(container);
+  try {
+    switch (currentReport) {
+      case 'budget_vs_actual': await reportBudgetVsActual(); break;
+      case 'expenses_by_date': await reportExpensesByDate(); break;
+      case 'expenses_by_plot': await reportExpensesByPlot(); break;
+      case 'budget_summary': await reportBudgetSummary(); break;
+    }
+  } catch (e) {
+    console.error(e);
+    document.getElementById('report-output').innerHTML = `<div class="text-center text-red-600 py-8">Imeshindikana: ${e.message}</div>`;
   }
 }
 
-async function reportBudget(container) {
-  const { data } = await supabase
-    .from('budget_categories')
-    .select(`*, items:budget_items(code, item, total_planned, total_actual)`)
-    .order('sort_order');
+// ============================================================================
+// REPORT 1: Budget vs Actual (Hierarchical)
+// ============================================================================
+async function reportBudgetVsActual() {
+  const { data: periods } = await supabase.from('budget_periods').select('id, name').eq('status', 'active').limit(1);
+  if (!periods || periods.length === 0) {
+    document.getElementById('report-output').innerHTML = '<div class="text-center text-gray-500 py-8">Hakuna bajeti active</div>';
+    return;
+  }
   
-  const flat = [];
-  (data || []).forEach(cat => {
-    (cat.items || []).forEach(item => {
-      flat.push({
-        category: cat.name,
-        code: item.code,
-        item: item.item,
-        planned: item.total_planned,
-        actual: item.total_actual,
-        variance: Number(item.total_planned) - Number(item.total_actual),
-        percent: item.total_planned > 0 ? ((item.total_actual / item.total_planned) * 100).toFixed(1) : 0
+  const { data: cats } = await supabase
+    .from('budget_categories')
+    .select('*, budget_items(id, code, item, item_type, parent_id, total_planned, total_actual)')
+    .eq('period_id', periods[0].id)
+    .order('display_order');
+  
+  if (!cats || cats.length === 0) {
+    document.getElementById('report-output').innerHTML = '<div class="text-center text-gray-500 py-8">Hakuna shughuli</div>';
+    return;
+  }
+  
+  const rows = [];
+  let grandPlanned = 0, grandActual = 0;
+  
+  cats.forEach(cat => {
+    const leaves = (cat.budget_items || []).filter(i => i.item_type === 'leaf');
+    const planned = leaves.reduce((s, i) => s + Number(i.total_planned || 0), 0);
+    const actual = leaves.reduce((s, i) => s + Number(i.total_actual || 0), 0);
+    grandPlanned += planned;
+    grandActual += actual;
+    rows.push({
+      code: cat.code,
+      item: cat.name,
+      type: 'Section',
+      planned, actual,
+      variance: planned - actual,
+      percent: planned > 0 ? (actual / planned * 100) : 0
+    });
+    // Items under this category
+    const headers = (cat.budget_items || []).filter(i => i.item_type === 'header');
+    headers.forEach(h => {
+      const children = leaves.filter(l => l.parent_id === h.id);
+      const hPlanned = children.reduce((s, c) => s + Number(c.total_planned || 0), 0);
+      const hActual = children.reduce((s, c) => s + Number(c.total_actual || 0), 0);
+      rows.push({
+        code: '  ' + h.code,
+        item: '  ' + h.item,
+        type: 'Activity',
+        planned: hPlanned, actual: hActual,
+        variance: hPlanned - hActual,
+        percent: hPlanned > 0 ? (hActual / hPlanned * 100) : 0
+      });
+      children.forEach(c => {
+        rows.push({
+          code: '    ' + c.code,
+          item: '    ' + c.item,
+          type: 'Item',
+          planned: Number(c.total_planned || 0),
+          actual: Number(c.total_actual || 0),
+          variance: Number(c.total_planned || 0) - Number(c.total_actual || 0),
+          percent: Number(c.total_planned || 0) > 0 ? (Number(c.total_actual || 0) / Number(c.total_planned || 0) * 100) : 0
+        });
       });
     });
   });
-  currentData = flat;
   
-  const totalPlanned = flat.reduce((s, r) => s + Number(r.planned), 0);
-  const totalActual = flat.reduce((s, r) => s + Number(r.actual), 0);
+  currentData = rows;
   
-  container.innerHTML = `
-    <h2 class="text-2xl font-bold text-green-900 mb-4">Budget vs Actual</h2>
-    <div class="grid grid-cols-3 gap-4 mb-6">
-      <div class="stat-card"><div class="stat-label">Planned</div><div class="stat-value">${formatTZS(totalPlanned)}</div></div>
-      <div class="stat-card" style="border-color:#3B82F6"><div class="stat-label">Actual</div><div class="stat-value">${formatTZS(totalActual)}</div></div>
-      <div class="stat-card" style="border-color:#F59E0B"><div class="stat-label">Variance</div><div class="stat-value">${formatTZS(totalPlanned - totalActual)}</div></div>
+  // Render
+  const grandVariance = grandPlanned - grandActual;
+  const grandPct = grandPlanned > 0 ? (grandActual / grandPlanned * 100) : 0;
+  
+  document.getElementById('report-output').innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+      <div class="stat-card"><div class="stat-label">Bajeti Jumla</div><div class="stat-value money">${formatTZS(grandPlanned)}</div></div>
+      <div class="stat-card blue"><div class="stat-label">Imetumika</div><div class="stat-value money">${formatTZS(grandActual)}</div></div>
+      <div class="stat-card ${grandVariance < 0 ? 'red' : 'orange'}"><div class="stat-label">Iliyobaki</div><div class="stat-value money ${grandVariance < 0 ? 'money-negative' : 'money-positive'}">${formatTZS(grandVariance)}</div></div>
+      <div class="stat-card purple"><div class="stat-label">Progress</div><div class="stat-value">${grandPct.toFixed(1)}%</div><div class="progress mt-2"><div class="progress-bar ${grandPct > 90 ? 'danger' : grandPct > 75 ? 'warning' : ''}" style="width:${Math.min(grandPct, 100)}%"></div></div></div>
     </div>
-    <canvas id="report-chart" height="80"></canvas>
-    <div class="overflow-x-auto mt-6">
+    <div class="overflow-x-auto">
       <table class="data-table">
-        <thead><tr><th>Code</th><th>Item</th><th>Category</th><th class="text-right">Planned</th><th class="text-right">Actual</th><th class="text-right">Variance</th><th class="text-right">%</th></tr></thead>
+        <thead><tr>
+          <th>Code</th><th>Kipengele</th><th>Aina</th>
+          <th class="text-right">Bajeti</th><th class="text-right">Halisi</th>
+          <th class="text-right">Tofauti</th><th class="text-right">%</th>
+        </tr></thead>
         <tbody>
-          ${flat.map(r => `
-            <tr>
-              <td class="font-mono text-xs">${r.code}</td>
+          ${rows.map(r => `
+            <tr class="${r.type === 'Section' ? 'font-bold bg-green-50' : r.type === 'Activity' ? 'bg-gray-50 font-medium' : ''}">
+              <td><code>${escapeHtml(r.code)}</code></td>
               <td>${escapeHtml(r.item)}</td>
-              <td>${escapeHtml(r.category)}</td>
-              <td class="text-right">${formatTZS(r.planned)}</td>
-              <td class="text-right">${formatTZS(r.actual)}</td>
-              <td class="text-right">${formatTZS(r.variance)}</td>
-              <td class="text-right">${r.percent}%</td>
+              <td><span class="badge badge-default">${r.type}</span></td>
+              <td class="text-right money">${formatNumber(r.planned)}</td>
+              <td class="text-right money">${formatNumber(r.actual)}</td>
+              <td class="text-right money ${r.variance < 0 ? 'money-negative' : 'money-positive'}">${formatNumber(r.variance)}</td>
+              <td class="text-right"><span class="${r.percent > 100 ? 'text-red-600 font-bold' : r.percent > 80 ? 'text-yellow-600' : ''}">${r.percent.toFixed(1)}%</span></td>
             </tr>
           `).join('')}
         </tbody>
       </table>
-    </div>
-  `;
-  
-  // Chart
-  currentChart = new Chart(document.getElementById('report-chart'), {
-    type: 'bar',
-    data: {
-      labels: data.map(c => c.code_prefix),
-      datasets: [
-        { label: 'Planned', data: data.map(c => c.subtotal_planned), backgroundColor: COLORS.greenLight },
-        { label: 'Actual', data: data.map(c => c.subtotal_actual), backgroundColor: COLORS.green }
-      ]
-    },
-    options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { callback: v => 'TZS ' + (v/1000000).toFixed(1) + 'M' } } } }
-  });
+    </div>`;
 }
 
-async function reportExpenses(container, from, to) {
-  let query = supabase
-    .from('expenses')
-    .select(`*, budget_item:budget_items(code, item)`)
-    .is('deleted_at', null);
-  if (from) query = query.gte('expense_date', from);
-  if (to) query = query.lte('expense_date', to);
+// ============================================================================
+// REPORT 2: Expenses by Date
+// ============================================================================
+async function reportExpensesByDate() {
+  const from = document.getElementById('date-from').value;
+  const to = document.getElementById('date-to').value;
   
-  const { data } = await query.order('expense_date', { ascending: false });
+  let q = supabase.from('expenses')
+    .select('*, budget_item:budget_items(code, item), plot:plots(name, code)')
+    .order('expense_date', { ascending: false });
+  if (from) q = q.gte('expense_date', from);
+  if (to) q = q.lte('expense_date', to);
+  
+  const { data, error } = await q;
+  if (error) throw error;
   currentData = data || [];
   
-  const total = currentData.reduce((s, e) => s + Number(e.amount), 0);
-  const byStatus = currentData.reduce((acc, e) => { acc[e.status] = (acc[e.status] || 0) + Number(e.amount); return acc; }, {});
+  const totalApproved = currentData.filter(e => e.status === 'approved').reduce((s, e) => s + Number(e.amount), 0);
+  const totalPending = currentData.filter(e => e.status === 'pending').reduce((s, e) => s + Number(e.amount), 0);
   
-  container.innerHTML = `
-    <h2 class="text-2xl font-bold text-green-900 mb-4">Matumizi (${from || 'Zote'} - ${to || 'Sasa'})</h2>
-    <div class="grid grid-cols-4 gap-4 mb-6">
-      <div class="stat-card"><div class="stat-label">Jumla</div><div class="stat-value">${formatTZS(total)}</div></div>
-      <div class="stat-card" style="border-color:#22C55E"><div class="stat-label">Approved</div><div class="stat-value">${formatTZS(byStatus.approved || 0)}</div></div>
-      <div class="stat-card" style="border-color:#F59E0B"><div class="stat-label">Pending</div><div class="stat-value">${formatTZS(byStatus.pending || 0)}</div></div>
-      <div class="stat-card" style="border-color:#EF4444"><div class="stat-label">Rejected</div><div class="stat-value">${formatTZS(byStatus.rejected || 0)}</div></div>
+  document.getElementById('report-output').innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      <div class="stat-card"><div class="stat-label">Matumizi (${currentData.length})</div><div class="stat-value money">${formatTZS(totalApproved + totalPending)}</div></div>
+      <div class="stat-card blue"><div class="stat-label">Yaliyoidhinishwa</div><div class="stat-value money">${formatTZS(totalApproved)}</div></div>
+      <div class="stat-card orange"><div class="stat-label">Yanasubiri</div><div class="stat-value money">${formatTZS(totalPending)}</div></div>
     </div>
     <div class="overflow-x-auto">
       <table class="data-table">
-        <thead><tr><th>Tarehe</th><th>Code</th><th>Maelezo</th><th>Supplier</th><th class="text-right">Kiasi</th><th>Status</th></tr></thead>
+        <thead><tr><th>Tarehe</th><th>Shamba</th><th>Kipengele</th><th>Maelezo</th><th class="text-right">Kiasi</th><th>Status</th></tr></thead>
         <tbody>
-          ${currentData.map(e => `
+          ${currentData.length === 0 ? '<tr><td colspan="6" class="text-center text-gray-500 py-6">Hakuna matumizi</td></tr>' : currentData.map(e => `
             <tr>
-              <td>${formatDate(e.expense_date)}</td>
-              <td class="font-mono text-xs">${e.budget_item?.code || '-'}</td>
+              <td class="text-xs">${formatDate(e.expense_date)}</td>
+              <td><span class="badge badge-info">${escapeHtml(e.plot?.code || '-')}</span></td>
+              <td class="text-xs">${escapeHtml(e.budget_item?.code || '')} ${escapeHtml(e.budget_item?.item || '')}</td>
               <td>${escapeHtml(e.description)}</td>
-              <td>${escapeHtml(e.supplier_name || '-')}</td>
-              <td class="text-right font-bold">${formatTZS(e.amount)}</td>
-              <td>${e.status}</td>
+              <td class="text-right money">${formatNumber(e.amount)}</td>
+              <td><span class="badge badge-${e.status === 'approved' ? 'success' : e.status === 'rejected' ? 'danger' : 'warning'}">${e.status}</span></td>
             </tr>
           `).join('')}
         </tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 }
 
-async function reportField(container) {
-  const { data } = await supabase
-    .from('field_activities')
-    .select(`*, budget_item:budget_items(code, item)`)
-    .order('planned_start_date');
-  currentData = data || [];
+// ============================================================================
+// REPORT 3: Expenses by Plot
+// ============================================================================
+async function reportExpensesByPlot() {
+  const from = document.getElementById('date-from').value;
+  const to = document.getElementById('date-to').value;
   
-  const totalPlanned = currentData.reduce((s, a) => s + Number(a.planned_hectares), 0);
-  const totalDone = currentData.reduce((s, a) => s + Number(a.completed_hectares), 0);
-  const pct = totalPlanned > 0 ? ((totalDone / totalPlanned) * 100).toFixed(1) : 0;
+  let q = supabase.from('expenses').select('*, plot:plots(id, name, code)').eq('status', 'approved');
+  if (from) q = q.gte('expense_date', from);
+  if (to) q = q.lte('expense_date', to);
   
-  container.innerHTML = `
-    <h2 class="text-2xl font-bold text-green-900 mb-4">Field Progress</h2>
-    <div class="grid grid-cols-3 gap-4 mb-6">
-      <div class="stat-card"><div class="stat-label">Hekta Zilizopangwa</div><div class="stat-value">${totalPlanned.toFixed(1)}</div></div>
-      <div class="stat-card" style="border-color:#22C55E"><div class="stat-label">Hekta Zilizofanyika</div><div class="stat-value">${totalDone.toFixed(1)}</div></div>
-      <div class="stat-card" style="border-color:#3B82F6"><div class="stat-label">Maendeleo</div><div class="stat-value">${pct}%</div></div>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="data-table">
-        <thead><tr><th>Shughuli</th><th>Code</th><th>Start</th><th>End</th><th class="text-right">Planned ha</th><th class="text-right">Done ha</th><th class="text-right">%</th><th>Status</th></tr></thead>
-        <tbody>
-          ${currentData.map(a => `
-            <tr>
-              <td>${escapeHtml(a.name)}</td>
-              <td class="text-xs">${a.budget_item?.code || '-'}</td>
-              <td>${formatDate(a.planned_start_date)}</td>
-              <td>${formatDate(a.planned_end_date)}</td>
-              <td class="text-right">${formatNumber(a.planned_hectares)}</td>
-              <td class="text-right">${formatNumber(a.completed_hectares)}</td>
-              <td class="text-right">${Number(a.progress_percentage).toFixed(1)}%</td>
-              <td>${a.status}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-async function reportPayroll(container) {
-  const { data } = await supabase
-    .from('payroll_items')
-    .select(`*, employee:employees(first_name, last_name, employee_number), period:payroll_periods(month, year)`)
-    .order('created_at', { ascending: false })
-    .limit(500);
-  currentData = data || [];
+  const { data, error } = await q;
+  if (error) throw error;
   
-  const total = currentData.reduce((s, i) => s + Number(i.net_pay), 0);
-  
-  container.innerHTML = `
-    <h2 class="text-2xl font-bold text-green-900 mb-4">Payroll Summary</h2>
-    <div class="grid grid-cols-2 gap-4 mb-6">
-      <div class="stat-card"><div class="stat-label">Idadi ya Records</div><div class="stat-value">${currentData.length}</div></div>
-      <div class="stat-card" style="border-color:#22C55E"><div class="stat-label">Jumla ya Malipo</div><div class="stat-value">${formatTZS(total)}</div></div>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="data-table">
-        <thead><tr><th>Period</th><th>Mfanyakazi</th><th class="text-right">Basic</th><th class="text-right">Allow</th><th class="text-right">Net</th><th>Status</th></tr></thead>
-        <tbody>
-          ${currentData.map(i => `
-            <tr>
-              <td>${i.period?.month}/${i.period?.year}</td>
-              <td>${escapeHtml(i.employee?.first_name)} ${escapeHtml(i.employee?.last_name)}</td>
-              <td class="text-right">${formatTZS(i.basic_salary)}</td>
-              <td class="text-right">${formatTZS(i.allowances)}</td>
-              <td class="text-right font-bold">${formatTZS(i.net_pay)}</td>
-              <td>${i.payment_status}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-function exportCurrent(btnEl) {
-  if (!currentData.length) { toast('Hakuna data ya ku-export', 'warning'); return; }
-  const fname = `${currentReport}-${todayISO()}`;
-  
-  const titles = {
-    budget: 'Ripoti ya Bajeti dhidi ya Matumizi Halisi',
-    expenses: 'Ripoti ya Matumizi',
-    field: 'Ripoti ya Shughuli za Shamba',
-    payroll: 'Ripoti ya Mishahara'
-  };
-  
-  const cols = {
-    budget: [
-      { key: 'code', label: 'Code' }, { key: 'item', label: 'Item' }, { key: 'category', label: 'Category' },
-      { key: 'planned', label: 'Planned (TZS)', value: r => formatNumber(r.planned) },
-      { key: 'actual', label: 'Actual (TZS)', value: r => formatNumber(r.actual) },
-      { key: 'variance', label: 'Variance (TZS)', value: r => formatNumber(r.variance) },
-      { key: 'percent', label: '%', value: r => (r.percent || 0).toFixed(1) }
-    ],
-    expenses: [
-      { key: 'expense_date', label: 'Date', value: e => formatDate(e.expense_date) },
-      { label: 'Code', value: e => e.budget_item?.code || '' },
-      { key: 'description', label: 'Description' },
-      { key: 'supplier_name', label: 'Supplier' },
-      { key: 'amount', label: 'Amount (TZS)', value: e => formatNumber(e.amount) },
-      { key: 'status', label: 'Status' }
-    ],
-    field: [
-      { key: 'name', label: 'Activity' },
-      { label: 'Code', value: a => a.budget_item?.code || '' },
-      { key: 'planned_hectares', label: 'Planned ha' },
-      { key: 'completed_hectares', label: 'Done ha' },
-      { key: 'progress_percentage', label: '%', value: a => (a.progress_percentage || 0).toFixed(1) },
-      { key: 'status', label: 'Status' }
-    ],
-    payroll: [
-      { label: 'Period', value: i => `${i.period?.month}/${i.period?.year}` },
-      { label: 'Employee', value: i => `${i.employee?.first_name} ${i.employee?.last_name}` },
-      { key: 'basic_salary', label: 'Basic (TZS)', value: i => formatNumber(i.basic_salary) },
-      { key: 'allowances', label: 'Allowance (TZS)', value: i => formatNumber(i.allowances) },
-      { key: 'net_pay', label: 'Net (TZS)', value: i => formatNumber(i.net_pay) },
-      { key: 'payment_status', label: 'Status' }
-    ]
-  };
-  
-  exportMenu(btnEl, currentData, fname, cols[currentReport], {
-    title: titles[currentReport],
-    subtitle: `Imezalishwa: ${formatDate(new Date())}`,
-    orientation: 'landscape'
+  // Group by plot
+  const grouped = {};
+  (data || []).forEach(e => {
+    const key = e.plot?.code || 'unknown';
+    if (!grouped[key]) grouped[key] = { plot: e.plot, total: 0, count: 0 };
+    grouped[key].total += Number(e.amount);
+    grouped[key].count++;
   });
+  
+  currentData = Object.values(grouped).sort((a, b) => b.total - a.total);
+  const grandTotal = currentData.reduce((s, g) => s + g.total, 0);
+  
+  document.getElementById('report-output').innerHTML = `
+    <div class="stat-card mb-4"><div class="stat-label">Jumla ya Matumizi</div><div class="stat-value money">${formatTZS(grandTotal)}</div><div class="stat-sub">${data?.length || 0} matumizi kwenye mashamba ${currentData.length}</div></div>
+    <div class="overflow-x-auto">
+      <table class="data-table">
+        <thead><tr><th>Shamba</th><th class="text-right">Idadi ya Matumizi</th><th class="text-right">Jumla (TZS)</th><th class="text-right">%</th></tr></thead>
+        <tbody>
+          ${currentData.length === 0 ? '<tr><td colspan="4" class="text-center text-gray-500 py-6">Hakuna matumizi</td></tr>' : currentData.map(g => `
+            <tr>
+              <td class="font-medium">${escapeHtml(g.plot?.name || 'Unknown')}</td>
+              <td class="text-right">${g.count}</td>
+              <td class="text-right money">${formatNumber(g.total)}</td>
+              <td class="text-right">${grandTotal > 0 ? ((g.total / grandTotal) * 100).toFixed(1) : 0}%</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ============================================================================
+// REPORT 4: Budget Summary
+// ============================================================================
+async function reportBudgetSummary() {
+  const { data: periods } = await supabase.from('budget_periods').select('*').order('start_date', { ascending: false });
+  currentData = periods || [];
+  
+  document.getElementById('report-output').innerHTML = `
+    <div class="overflow-x-auto">
+      <table class="data-table">
+        <thead><tr><th>Jina</th><th>Mwaka</th><th>Tarehe</th><th class="text-right">Bajeti</th><th class="text-right">Imetumika</th><th class="text-right">%</th><th>Status</th></tr></thead>
+        <tbody>
+          ${currentData.length === 0 ? '<tr><td colspan="7" class="text-center text-gray-500 py-6">Hakuna bajeti</td></tr>' : currentData.map(p => {
+            const planned = Number(p.total_planned_budget || 0);
+            const actual = Number(p.total_actual_spent || 0);
+            const pct = planned > 0 ? (actual / planned * 100) : 0;
+            return `
+              <tr>
+                <td class="font-medium">${escapeHtml(p.name)}</td>
+                <td>${escapeHtml(p.fiscal_year || '-')}</td>
+                <td class="text-xs">${formatDate(p.start_date)} - ${formatDate(p.end_date)}</td>
+                <td class="text-right money">${formatNumber(planned)}</td>
+                <td class="text-right money">${formatNumber(actual)}</td>
+                <td class="text-right"><span class="${pct > 100 ? 'text-red-600 font-bold' : pct > 80 ? 'text-yellow-600' : ''}">${pct.toFixed(1)}%</span></td>
+                <td><span class="badge badge-${p.status === 'active' ? 'success' : 'default'}">${p.status}</span></td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+function exportCurrent(btnEl) {
+  const filename = `ripoti-${currentReport}-${todayISO()}`;
+  let cols;
+  switch (currentReport) {
+    case 'budget_vs_actual':
+      cols = [
+        { key: 'code', label: 'Code' }, { key: 'item', label: 'Kipengele' }, { key: 'type', label: 'Aina' },
+        { key: 'planned', label: 'Bajeti (TZS)', value: r => formatNumber(r.planned) },
+        { key: 'actual', label: 'Halisi (TZS)', value: r => formatNumber(r.actual) },
+        { key: 'variance', label: 'Tofauti (TZS)', value: r => formatNumber(r.variance) },
+        { key: 'percent', label: '%', value: r => r.percent.toFixed(1) + '%' }
+      ];
+      break;
+    case 'expenses_by_date':
+      cols = [
+        { key: 'expense_date', label: 'Tarehe', value: e => formatDate(e.expense_date) },
+        { label: 'Shamba', value: e => e.plot?.name || '' },
+        { label: 'Code', value: e => e.budget_item?.code || '' },
+        { label: 'Kipengele', value: e => e.budget_item?.item || '' },
+        { key: 'description', label: 'Maelezo' },
+        { key: 'amount', label: 'Kiasi (TZS)', value: e => formatNumber(e.amount) },
+        { key: 'status', label: 'Status' }
+      ];
+      break;
+    case 'expenses_by_plot':
+      cols = [
+        { label: 'Shamba', value: g => g.plot?.name || '' },
+        { key: 'count', label: 'Idadi' },
+        { key: 'total', label: 'Jumla (TZS)', value: g => formatNumber(g.total) }
+      ];
+      break;
+    case 'budget_summary':
+      cols = [
+        { key: 'name', label: 'Jina' }, { key: 'fiscal_year', label: 'Mwaka' },
+        { key: 'start_date', label: 'Anza' }, { key: 'end_date', label: 'Mwisho' },
+        { key: 'total_planned_budget', label: 'Bajeti', value: p => formatNumber(p.total_planned_budget) },
+        { key: 'total_actual_spent', label: 'Halisi', value: p => formatNumber(p.total_actual_spent) },
+        { key: 'status', label: 'Status' }
+      ];
+      break;
+  }
+  exportMenu(btnEl, currentData, filename, cols, { title: REPORT_TITLES[currentReport], orientation: 'landscape' });
 }

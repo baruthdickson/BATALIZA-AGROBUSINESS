@@ -337,7 +337,6 @@ function openItemModal(item = null, categoryId = null, parentId = null) {
       </div>
       <div class="grid grid-cols-2 gap-3 mt-3">
         <div><label class="form-label">Miezi</label><input type="number" name="months" class="form-input" value="${item?.months || 1}"></div>
-        <div><label class="form-label">Matumizi Halisi</label><input type="number" step="0.01" name="total_actual" class="form-input" value="${item?.total_actual || 0}"></div>
       </div>
     </div>
     <div><label class="form-label">Maelezo</label><textarea name="description" class="form-textarea" rows="2">${item?.description || ''}</textarea></div>
@@ -361,8 +360,7 @@ function openItemModal(item = null, categoryId = null, parentId = null) {
       unit: type === 'leaf' ? (fd.get('unit') || null) : null,
       unit_price: type === 'leaf' ? (parseFloat(fd.get('unit_price')) || 0) : 0,
       quantity: type === 'leaf' ? (parseFloat(fd.get('quantity')) || 1) : 0,
-      months: type === 'leaf' ? (parseInt(fd.get('months')) || 1) : 1,
-      total_actual: type === 'leaf' ? (parseFloat(fd.get('total_actual')) || 0) : 0
+      months: type === 'leaf' ? (parseInt(fd.get('months')) || 1) : 1
     };
     let err;
     if (item) ({ error: err } = await supabase.from('budget_items').update(data).eq('id', item.id));

@@ -5,11 +5,43 @@
 -- 3. Ingiza data halisi ya Mashamba Makubwa 2025-2026
 -- ============================================================================
 
--- ============== STEP 1: ONGEZA COLUMNS MUHIMU ==============
-ALTER TABLE budget_periods ADD COLUMN IF NOT EXISTS plot_id BIGINT REFERENCES plots(id);
-ALTER TABLE expenses ADD COLUMN IF NOT EXISTS plot_id BIGINT REFERENCES plots(id);
-ALTER TABLE budget_items ADD COLUMN IF NOT EXISTS parent_id BIGINT REFERENCES budget_items(id) ON DELETE CASCADE;
-ALTER TABLE budget_items ADD COLUMN IF NOT EXISTS item_type TEXT DEFAULT 'leaf' CHECK (item_type IN ('header','leaf'));
+-- ============== STEP 1: ONGEZA COLUMNS MUHIMU (na kagua kama zipo) ==============
+
+-- budget_periods columns
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='budget_periods' AND column_name='plot_id') THEN
+    ALTER TABLE budget_periods ADD COLUMN plot_id BIGINT REFERENCES plots(id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='budget_periods' AND column_name='fiscal_year') THEN
+    ALTER TABLE budget_periods ADD COLUMN fiscal_year TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='budget_periods' AND column_name='total_planned_budget') THEN
+    ALTER TABLE budget_periods ADD COLUMN total_planned_budget NUMERIC(15,2) DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='budget_periods' AND column_name='total_actual_spent') THEN
+    ALTER TABLE budget_periods ADD COLUMN total_actual_spent NUMERIC(15,2) DEFAULT 0;
+  END IF;
+END $$;
+
+-- budget_items columns
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='budget_items' AND column_name='parent_id') THEN
+    ALTER TABLE budget_items ADD COLUMN parent_id BIGINT REFERENCES budget_items(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='budget_items' AND column_name='item_type') THEN
+    ALTER TABLE budget_items ADD COLUMN item_type TEXT DEFAULT 'leaf';
+  END IF;
+END $$;
+
+-- expenses columns
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='expenses' AND column_name='plot_id') THEN
+    ALTER TABLE expenses ADD COLUMN plot_id BIGINT REFERENCES plots(id);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_budget_items_parent ON budget_items(parent_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_plot ON expenses(plot_id);
@@ -54,13 +86,30 @@ CREATE TRIGGER trg_expense_budget
   AFTER INSERT OR UPDATE OR DELETE ON expenses
   FOR EACH ROW EXECUTE FUNCTION update_budget_actual_on_expense();
 
--- ============== STEP 3: HAKIKISHA PLOTS ZIPO ==============
+-- ============== STEP 3: HAKIKISHA PLOTS TABLE INA COLUMNS ZOTE + DATA ==============
+-- Ongeza columns zinazokosekana kama hazipo
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='plots' AND column_name='hectares') THEN
+    ALTER TABLE plots ADD COLUMN hectares NUMERIC(10,2) DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='plots' AND column_name='location') THEN
+    ALTER TABLE plots ADD COLUMN location TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='plots' AND column_name='code') THEN
+    ALTER TABLE plots ADD COLUMN code TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='plots' AND column_name='name') THEN
+    ALTER TABLE plots ADD COLUMN name TEXT;
+  END IF;
+END $$;
+
 INSERT INTO plots (code, name, hectares, location) VALUES
   ('BLOCK-A', 'Shamba A (Block A)', 50, 'Tabora - Urambo'),
   ('BLOCK-B', 'Shamba B (Block B)', 50, 'Tabora - Urambo'),
   ('BLOCK-C', 'Shamba C (Block C)', 50, 'Tabora - Urambo'),
   ('BLOCK-D', 'Shamba D (Block D)', 35, 'Tabora - Urambo')
-ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, hectares = EXCLUDED.hectares;
 
 -- ============== STEP 4: INGIZA BAJETI HALISI YA MASHAMBA MAKUBWA 2025-2026 ==============
 -- Bajeti hii inatoka kwenye picha za mteja

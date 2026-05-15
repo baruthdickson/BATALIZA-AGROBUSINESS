@@ -2,54 +2,81 @@
 <html lang="sw">
 <head>
   <meta charset="UTF-8">
+  <link rel="preconnect" href="https://cdn.tailwindcss.com">
+  <link rel="preconnect" href="https://esm.sh">
+  <link rel="preconnect" href="https://whexrklnrkigfqpdfzbt.supabase.co">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ripoti - BATALIZA AGROBUSINESS</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .report-btn { padding: 0.875rem 1rem; border: 1.5px solid #BBF7D0; border-radius: 0.75rem; background: white; cursor: pointer; text-align: left; transition: all 0.15s; }
+    .report-btn:hover { background: #F0FDF4; border-color: #16A34A; }
+    .report-btn.active { background: #DCFCE7; border-color: #16A34A; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1); }
+  </style>
 </head>
-<body class="bg-green-50">
+<body>
   <div id="sidebar-container"></div>
   <main class="lg:ml-64 min-h-screen">
     <div id="topbar-container"></div>
-    <div class="p-6 space-y-6">
+    <div class="p-4 lg:p-6 space-y-4">
       
+      <!-- Report selector -->
       <div class="card">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <button class="btn btn-secondary report-btn" data-report="budget">📊 Budget vs Actual</button>
-          <button class="btn btn-secondary report-btn" data-report="expenses">🧾 Matumizi kwa Period</button>
-          <button class="btn btn-secondary report-btn" data-report="field">🌱 Field Progress</button>
-          <button class="btn btn-secondary report-btn" data-report="payroll">💰 Payroll Summary</button>
+        <h3 class="text-base font-bold text-green-900 mb-3">Chagua Aina ya Ripoti</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <button class="report-btn active" data-report="budget_vs_actual">
+            <div class="font-bold text-green-900">📊 Bajeti vs Halisi</div>
+            <div class="text-xs text-gray-600 mt-1">Linganisha bajeti na matumizi halisi</div>
+          </button>
+          <button class="report-btn" data-report="expenses_by_date">
+            <div class="font-bold text-green-900">🧾 Matumizi kwa Tarehe</div>
+            <div class="text-xs text-gray-600 mt-1">Orodha ya matumizi kwa kipindi</div>
+          </button>
+          <button class="report-btn" data-report="expenses_by_plot">
+            <div class="font-bold text-green-900">🏞️ Matumizi kwa Shamba</div>
+            <div class="text-xs text-gray-600 mt-1">Muhtasari kwa kila shamba</div>
+          </button>
+          <button class="report-btn" data-report="budget_summary">
+            <div class="font-bold text-green-900">💵 Muhtasari Bajeti</div>
+            <div class="text-xs text-gray-600 mt-1">Bajeti zote</div>
+          </button>
         </div>
       </div>
       
+      <!-- Filters -->
       <div class="card flex flex-wrap items-end gap-3">
-        <div>
-          <label class="form-label">Tangu</label>
-          <input type="date" id="report-from" class="form-input">
+        <div id="date-filters" class="flex flex-wrap gap-3" style="display:none">
+          <div>
+            <label class="form-label">Tangu</label>
+            <input type="date" id="date-from" class="form-input">
+          </div>
+          <div>
+            <label class="form-label">Mpaka</label>
+            <input type="date" id="date-to" class="form-input">
+          </div>
         </div>
-        <div>
-          <label class="form-label">Hadi</label>
-          <input type="date" id="report-to" class="form-input">
-        </div>
-        <button id="generate-btn" class="btn btn-primary">Generate</button>
-        <button id="export-report-btn" class="btn btn-secondary">📥 Export CSV</button>
+        <button id="generate-btn" class="btn btn-primary">⚡ Tengeneza</button>
+        <button id="export-btn" class="btn btn-secondary">📥 Export</button>
       </div>
       
-      <div id="report-container" class="card">
-        <div class="text-center text-gray-500 py-12">Chagua aina ya ripoti hapo juu</div>
+      <!-- Report output -->
+      <div class="card">
+        <h2 id="report-title" class="text-xl font-bold text-green-900 mb-4">Ripoti</h2>
+        <div id="report-output">
+          <div class="text-center text-gray-500 py-12">Chagua aina ya ripoti na bofya "Tengeneza"</div>
+        </div>
       </div>
       
     </div>
   </main>
   
   <script type="module">
-    import { requireAuth, requirePermission, requireBusinessUser } from './js/auth.js';
+    import { requireBusinessUser } from './js/auth.js';
     import { initLayout } from './js/layout.js';
     import { initReports } from './js/pages/reports.js';
     
     await requireBusinessUser();
-    if (!requirePermission('reports', 'view_dashboard')) throw new Error('No permission');
     initLayout('Ripoti');
     await initReports();
   </script>

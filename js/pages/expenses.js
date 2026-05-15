@@ -339,11 +339,22 @@ function openExpenseModal(expense = null) {
         reference_number: fd.get('reference_number') || null,
         receipt_url
       };
-      if (!expense) data.created_by = getCurrentProfile()?.id;
+      if (!expense) {
+        const profile = getCurrentProfile();
+        if (profile?.id) data.created_by = profile.id;
+      }
       
       let err;
       if (expense) ({ error: err } = await supabase.from('expenses').update(data).eq('id', expense.id));
-      else ({ error: err } = await supabase.from('expenses').insert(data));
+      else {
+        let result = await supabase.from('expenses').insert(data);
+        // Retry bila created_by kama column haipo (schema cache issue)
+        if (result.error && result.error.message.includes('created_by')) {
+          delete data.created_by;
+          result = await supabase.from('expenses').insert(data);
+        }
+        err = result.error;
+      }
       if (err) throw err;
       
       await logAction(expense ? 'update' : 'create', 'expenses', `${expense ? 'Amebadilisha' : 'Ameingiza'} matumizi: ${data.description} - TZS ${data.amount.toLocaleString()}`);
@@ -360,10 +371,20 @@ function openExpenseModal(expense = null) {
 
 async function updateStatus(id, status, reason = null) {
   const profile = getCurrentProfile();
-  const updates = { status, approved_by: profile.id, approved_at: new Date().toISOString() };
+  const updates = { status };
+  if (profile?.id) {
+    updates.approved_by = profile.id;
+    updates.approved_at = new Date().toISOString();
+  }
   if (reason) updates.rejection_reason = reason;
   
-  const { error } = await supabase.from('expenses').update(updates).eq('id', id);
+  let { error } = await supabase.from('expenses').update(updates).eq('id', id);
+  // Retry bila approved_by/approved_at kama columns hazipo
+  if (error && (error.message.includes('approved_by') || error.message.includes('approved_at') || error.message.includes('rejection_reason'))) {
+    const minimal = { status };
+    if (reason && !error.message.includes('rejection_reason')) minimal.rejection_reason = reason;
+    ({ error } = await supabase.from('expenses').update(minimal).eq('id', id));
+  }
   if (error) { toast(error.message, 'error'); return; }
   
   const expense = allExpenses.find(e => e.id === id);

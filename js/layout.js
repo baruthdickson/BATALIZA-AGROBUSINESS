@@ -12,27 +12,34 @@ import { supabase } from './supabase.js';
 // FOCUS: Bajeti + Matumizi vinaonyeshwa kikamilifu.
 // Vingine vimefichwa kwa sasa (mteja ataongeza baadaye)
 // ============================================================================
+// Modern SVG icons (Lucide-style, inline)
+const ICONS = {
+  dashboard: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>',
+  budget: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+  expenses: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>',
+  reports: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>',
+  users: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  settings: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
+  logout: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>',
+  admin: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>',
+  external: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>'
+};
+
 const MENU_ITEMS = [
-  { icon: '📊', label: 'Dashboard', href: 'dashboard.html', perm: ['reports', 'view_dashboard'] },
-  { icon: '💵', label: 'Bajeti', href: 'budget.html', perm: ['budget', 'view'] },
-  { icon: '🧾', label: 'Matumizi', href: 'expenses.html', perm: ['expenses', 'view'] },
-  // === VIPENGELE VYA BAADAYE (vimefichwa kwa sasa) ===
-  // { icon: '🌱', label: 'Shughuli za Shamba', href: 'field-activities.html', perm: ['field_activities', 'view'] },
-  // { icon: '👥', label: 'Wafanyakazi', href: 'hr.html', perm: ['hr', 'view'] },
-  // { icon: '💰', label: 'Mishahara', href: 'payroll.html', perm: ['payroll', 'view'] },
-  // { icon: '📦', label: 'Vifaa & Stock', href: 'inventory.html', perm: ['inventory', 'view'] },
-  // { icon: '🚜', label: 'Magari & Mafuta', href: 'fleet.html', perm: ['fleet', 'view'] },
-  { icon: '📈', label: 'Ripoti', href: 'reports.html', perm: ['reports', 'view_dashboard'] },
+  { icon: ICONS.dashboard, label: 'Dashboard', href: 'dashboard.html', perm: ['reports', 'view_dashboard'] },
+  { icon: ICONS.budget, label: 'Bajeti', href: 'budget.html', perm: ['budget', 'view'] },
+  { icon: ICONS.expenses, label: 'Matumizi', href: 'expenses.html', perm: ['expenses', 'view'] },
+  { icon: ICONS.reports, label: 'Ripoti', href: 'reports.html', perm: ['reports', 'view_dashboard'] },
 ];
 
 const PM_ONLY_ITEMS = [
-  { icon: '👤', label: 'Watumiaji', href: 'users.html', perm: ['users', 'view'] },
-  { icon: '⚙️', label: 'Settings', href: 'settings.html', perm: ['system', 'edit_company'] },
+  { icon: ICONS.users, label: 'Watumiaji', href: 'users.html', perm: ['users', 'view'] },
+  { icon: ICONS.settings, label: 'Mipangilio', href: 'settings.html', perm: ['system', 'edit_company'] },
 ];
 
 // Admin-only menu (haoni biashara)
 const ADMIN_MENU_ITEMS = [
-  { icon: '🔧', label: 'Admin Dashboard', href: 'admin.html' },
+  { icon: ICONS.admin, label: 'Admin Dashboard', href: 'admin.html' },
 ];
 
 // ============================================================================
@@ -77,7 +84,7 @@ export function renderAdminSidebar() {
       <nav class="py-2">
         ${ADMIN_MENU_ITEMS.map(item => `
           <a href="${item.href}" class="flex items-center gap-3 px-4 py-3 hover:bg-green-800 transition ${currentPage === item.href ? 'bg-green-800 border-l-4 border-yellow-400' : ''}">
-            <span class="text-xl">${item.icon}</span>
+            <span class="text-green-100">${item.icon}</span>
             <span class="text-sm">${item.label}</span>
           </a>
         `).join('')}
@@ -85,14 +92,14 @@ export function renderAdminSidebar() {
         <div class="border-t border-green-800 mt-2 pt-2">
           <div class="px-4 py-2 text-xs text-green-300 uppercase">External</div>
           <a href="https://supabase.com/dashboard" target="_blank" class="flex items-center gap-3 px-4 py-3 hover:bg-green-800 transition">
-            <span class="text-xl">☁️</span>
+            <span class="text-green-100">${ICONS.external}</span>
             <span class="text-sm">Supabase Console</span>
           </a>
         </div>
         
         <div class="border-t border-green-800 mt-2 pt-2">
           <button id="logout-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-900 transition text-left">
-            <span class="text-xl">🚪</span>
+            <span class="text-green-100">${ICONS.logout}</span>
             <span class="text-sm">Toka</span>
           </button>
         </div>
@@ -177,7 +184,7 @@ export function renderSidebar() {
       <nav class="py-2">
         ${visibleItems.map(item => `
           <a href="${item.href}" class="flex items-center gap-3 px-4 py-3 hover:bg-green-800 transition ${currentPage === item.href ? 'bg-green-800 border-l-4 border-green-400' : ''}">
-            <span class="text-xl">${item.icon}</span>
+            <span class="text-green-100">${item.icon}</span>
             <span class="text-sm">${item.label}</span>
           </a>
         `).join('')}
@@ -187,7 +194,7 @@ export function renderSidebar() {
             <div class="px-4 py-1 text-xs text-green-300 uppercase">Usimamizi</div>
             ${visiblePMItems.map(item => `
               <a href="${item.href}" class="flex items-center gap-3 px-4 py-3 hover:bg-green-800 transition ${currentPage === item.href ? 'bg-green-800 border-l-4 border-green-400' : ''}">
-                <span class="text-xl">${item.icon}</span>
+                <span class="text-green-100">${item.icon}</span>
                 <span class="text-sm">${item.label}</span>
               </a>
             `).join('')}
@@ -196,7 +203,7 @@ export function renderSidebar() {
         
         <div class="border-t border-green-800 mt-2 pt-2">
           <button id="logout-btn" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-900 transition text-left">
-            <span class="text-xl">🚪</span>
+            <span class="text-green-100">${ICONS.logout}</span>
             <span class="text-sm">Toka</span>
           </button>
         </div>
