@@ -433,10 +433,9 @@ function openExpenseModal(expense = null) {
       if (!expense) {
         const profile = getCurrentProfile();
         if (profile?.id) {
-          // Set all possible "who created this" columns
+          // Set possible "who created this" columns (smart retry itaondoa zisizopo)
           data.created_by = profile.id;
           data.recorded_by = profile.id;
-          data.user_id = profile.id;
           data.approved_by = profile.id;
           data.approved_at = new Date().toISOString();
         }
@@ -454,22 +453,30 @@ function openExpenseModal(expense = null) {
           
           let removed = false;
           
-          // Pattern 1: "column \"xxx\" does not exist" or similar
-          const colMatch = msg.match(/column "([^"]+)"/);
+          // Pattern 1: "column 'xxx' does not exist" — inashughulika na single OR double quotes
+          const colMatch = msg.match(/column ['"]([^'"]+)['"]/);
           if (colMatch && data[colMatch[1]] !== undefined) {
+            console.log(`Removing column: ${colMatch[1]}`);
             delete data[colMatch[1]];
             removed = true;
           }
           
-          // Pattern 2: check constraint violation (e.g., status check)
+          // Pattern 2: "Could not find the 'xxx' column"
+          if (!removed) {
+            const notFoundMatch = msg.match(/find the ['"]([^'"]+)['"] column/);
+            if (notFoundMatch && data[notFoundMatch[1]] !== undefined) {
+              console.log(`Removing not-found column: ${notFoundMatch[1]}`);
+              delete data[notFoundMatch[1]];
+              removed = true;
+            }
+          }
+          
+          // Pattern 3: check constraint violation (e.g., status check)
           if (!removed && msg.includes('check constraint')) {
-            // Try removing status if it's the issue
-            const checkMatch = msg.match(/constraint "([^"]+)"/);
+            const checkMatch = msg.match(/constraint ['"]([^'"]+)['"]/);
             if (checkMatch) {
               const constraintName = checkMatch[1];
-              // Guess column from constraint name
               if (constraintName.includes('status') && data.status) {
-                // Try different status values
                 if (data.status === 'approved') data.status = 'pending';
                 else if (data.status === 'pending') { delete data.status; }
                 removed = true;
@@ -477,12 +484,11 @@ function openExpenseModal(expense = null) {
             }
           }
           
-          // Pattern 3: foreign key constraint - remove the problematic field
+          // Pattern 4: foreign key constraint
           if (!removed && msg.includes('foreign key constraint')) {
-            const fkMatch = msg.match(/violates foreign key constraint "([^"]+)"/);
+            const fkMatch = msg.match(/constraint ['"]([^'"]+)['"]/);
             if (fkMatch) {
               const fkName = fkMatch[1];
-              // Identify which column from FK name
               ['approved_by', 'created_by', 'recorded_by', 'user_id', 'plot_id', 'budget_item_id'].forEach(col => {
                 if (fkName.includes(col) && data[col] !== undefined) {
                   data[col] = null;
@@ -492,9 +498,9 @@ function openExpenseModal(expense = null) {
             }
           }
           
-          // Pattern 4: RLS / permission errors - try removing user references
+          // Pattern 5: RLS error
           if (!removed && (msg.includes('row-level security') || msg.includes('permission'))) {
-            console.error('RLS issue - check policies');
+            console.error('RLS issue - need to fix policies in SQL');
             break;
           }
           
