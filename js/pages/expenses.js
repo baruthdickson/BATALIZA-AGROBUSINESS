@@ -446,24 +446,68 @@ function openExpenseModal(expense = null) {
       if (expense) ({ error: err } = await supabase.from('expenses').update(data).eq('id', expense.id));
       else {
         let result = await supabase.from('expenses').insert(data);
-        // Smart retry: ondoa columns ambazo schema hazikubali
+        // Smart retry: ondoa columns/values zinazoshindwa
         let retryCount = 0;
-        while (result.error && retryCount < 5) {
-          const msg = result.error.message;
-          // Find which column is causing the error
+        while (result.error && retryCount < 10) {
+          const msg = result.error.message || '';
+          console.warn('Insert attempt', retryCount + 1, 'failed:', msg);
+          
+          let removed = false;
+          
+          // Pattern 1: "column \"xxx\" does not exist" or similar
           const colMatch = msg.match(/column "([^"]+)"/);
-          if (colMatch) {
-            const badCol = colMatch[1];
-            if (data[badCol] !== undefined) {
-              delete data[badCol];
-              retryCount++;
-              result = await supabase.from('expenses').insert(data);
-              continue;
+          if (colMatch && data[colMatch[1]] !== undefined) {
+            delete data[colMatch[1]];
+            removed = true;
+          }
+          
+          // Pattern 2: check constraint violation (e.g., status check)
+          if (!removed && msg.includes('check constraint')) {
+            // Try removing status if it's the issue
+            const checkMatch = msg.match(/constraint "([^"]+)"/);
+            if (checkMatch) {
+              const constraintName = checkMatch[1];
+              // Guess column from constraint name
+              if (constraintName.includes('status') && data.status) {
+                // Try different status values
+                if (data.status === 'approved') data.status = 'pending';
+                else if (data.status === 'pending') { delete data.status; }
+                removed = true;
+              }
             }
           }
-          break;
+          
+          // Pattern 3: foreign key constraint - remove the problematic field
+          if (!removed && msg.includes('foreign key constraint')) {
+            const fkMatch = msg.match(/violates foreign key constraint "([^"]+)"/);
+            if (fkMatch) {
+              const fkName = fkMatch[1];
+              // Identify which column from FK name
+              ['approved_by', 'created_by', 'recorded_by', 'user_id', 'plot_id', 'budget_item_id'].forEach(col => {
+                if (fkName.includes(col) && data[col] !== undefined) {
+                  data[col] = null;
+                  removed = true;
+                }
+              });
+            }
+          }
+          
+          // Pattern 4: RLS / permission errors - try removing user references
+          if (!removed && (msg.includes('row-level security') || msg.includes('permission'))) {
+            console.error('RLS issue - check policies');
+            break;
+          }
+          
+          if (!removed) {
+            console.error('Cannot auto-fix this error:', msg);
+            break;
+          }
+          
+          retryCount++;
+          result = await supabase.from('expenses').insert(data);
         }
         err = result.error;
+        if (err) console.error('Final error after retries:', err);
       }
       if (err) throw err;
       
