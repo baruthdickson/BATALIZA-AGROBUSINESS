@@ -150,14 +150,12 @@ async function enrichExpensesClientSide() {
 }
 
 function applyFilters() {
-  const status = document.getElementById('filter-status')?.value || '';
   const plotId = document.getElementById('filter-plot')?.value || '';
   const search = document.getElementById('filter-search')?.value.toLowerCase() || '';
   const fromDate = document.getElementById('filter-from')?.value;
   const toDate = document.getElementById('filter-to')?.value;
   
   filteredExpenses = allExpenses.filter(e => {
-    if (status && e.status !== status) return false;
     if (plotId && e.plot_id != plotId) return false;
     if (fromDate && e.expense_date < fromDate) return false;
     if (toDate && e.expense_date > toDate) return false;
@@ -173,41 +171,47 @@ function applyFilters() {
 }
 
 function renderStats() {
-  const pending = allExpenses.filter(e => e.status === 'pending');
-  const approved = allExpenses.filter(e => e.status === 'approved');
-  const thisMonth = approved.filter(e => {
+  // Hesabu zote kama approved (single user, hakuna approval flow)
+  const total = allExpenses.reduce((s, e) => s + Number(e.amount), 0);
+  const thisMonth = allExpenses.filter(e => {
     const d = new Date(e.expense_date);
     const now = new Date();
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
-  
-  const totalApproved = approved.reduce((s, e) => s + Number(e.amount), 0);
-  const totalPending = pending.reduce((s, e) => s + Number(e.amount), 0);
   const totalMonth = thisMonth.reduce((s, e) => s + Number(e.amount), 0);
+  
+  // Per shamba
+  const byPlot = {};
+  allExpenses.forEach(e => {
+    const code = e.plot?.code || 'N/A';
+    if (!byPlot[code]) byPlot[code] = 0;
+    byPlot[code] += Number(e.amount);
+  });
+  const topPlot = Object.entries(byPlot).sort((a, b) => b[1] - a[1])[0];
   
   const el = document.getElementById('expense-stats');
   if (!el) return;
   el.innerHTML = `
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="stat-card">
-        <div class="stat-label">Jumla Yaliyoidhinishwa</div>
-        <div class="stat-value money">${formatTZS(totalApproved)}</div>
-        <div class="stat-sub">${approved.length} matumizi</div>
-      </div>
-      <div class="stat-card orange">
-        <div class="stat-label">Yanasubiri</div>
-        <div class="stat-value money">${formatTZS(totalPending)}</div>
-        <div class="stat-sub">${pending.length} ya kuidhinishwa</div>
+        <div class="stat-label">Jumla ya Matumizi</div>
+        <div class="stat-value money">${formatTZS(total)}</div>
+        <div class="stat-sub">${allExpenses.length} matumizi yaliyoingizwa</div>
       </div>
       <div class="stat-card blue">
         <div class="stat-label">Mwezi Huu</div>
         <div class="stat-value money">${formatTZS(totalMonth)}</div>
-        <div class="stat-sub">${thisMonth.length} matumizi</div>
+        <div class="stat-sub">${thisMonth.length} matumizi mwezi huu</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-label">Wastani kwa Matumizi</div>
+        <div class="stat-value money">${formatTZS(allExpenses.length > 0 ? total / allExpenses.length : 0)}</div>
+        <div class="stat-sub">Average per expense</div>
       </div>
       <div class="stat-card purple">
-        <div class="stat-label">Jumla Yote</div>
-        <div class="stat-value">${allExpenses.length}</div>
-        <div class="stat-sub">Yote yaliyoingizwa</div>
+        <div class="stat-label">Shamba Linaloongoza</div>
+        <div class="stat-value" style="font-size: 1.5rem">${topPlot ? topPlot[0] : '-'}</div>
+        <div class="stat-sub">${topPlot ? formatTZS(topPlot[1]) : 'Hakuna data'}</div>
       </div>
     </div>`;
 }
@@ -230,12 +234,6 @@ function renderExpenses() {
   const pageData = filteredExpenses.slice(start, start + PAGE_SIZE);
   
   tbody.innerHTML = pageData.map(e => {
-    const statusBadge = {
-      pending: '<span class="badge badge-warning">⏳ Inasubiri</span>',
-      approved: '<span class="badge badge-success">✓ Imeidhinishwa</span>',
-      rejected: '<span class="badge badge-danger">✗ Imekataliwa</span>'
-    }[e.status] || e.status;
-    
     return `
       <tr>
         <td class="whitespace-nowrap text-sm">${formatDate(e.expense_date)}</td>
@@ -245,17 +243,12 @@ function renderExpenses() {
           ${e.budget_item ? `<div class="text-xs text-gray-500">${escapeHtml(e.budget_item.code)} - ${escapeHtml(e.budget_item.item)}</div>` : ''}
         </td>
         <td class="text-sm">${escapeHtml(e.supplier_name || '-')}</td>
-        <td class="text-right money">${formatNumber(e.amount)}</td>
-        <td>${statusBadge}</td>
-        <td class="text-sm">${e.approver ? escapeHtml(e.approver.full_name) : '-'}</td>
-        <td>${e.receipt_url ? `<button class="text-blue-600 text-sm" onclick="window.viewReceipt('${e.receipt_url}')">📎 Risiti</button>` : '-'}</td>
+        <td class="text-sm">${escapeHtml(e.payment_method || '-')}</td>
+        <td class="text-right money font-bold text-green-700">${formatNumber(e.amount)}</td>
+        <td>${e.receipt_url ? `<button class="text-blue-600 text-sm" onclick="window.viewReceipt('${e.receipt_url}')">📎 Tazama</button>` : '-'}</td>
         <td class="whitespace-nowrap">
-          ${e.status === 'pending' && hasPermission('expenses', 'approve') ? `
-            <button class="text-green-600 text-sm" onclick="window.approveExpense(${e.id})" title="Idhinisha">✓</button>
-            <button class="text-red-600 text-sm ml-1" onclick="window.rejectExpense(${e.id})" title="Kataa">✗</button>
-          ` : ''}
-          ${hasPermission('expenses', 'edit') ? `<button class="text-blue-600 text-sm ml-1" onclick="window.editExpense(${e.id})" title="Hariri">✏️</button>` : ''}
-          ${hasPermission('expenses', 'delete') ? `<button class="text-red-700 text-sm ml-1" onclick="window.deleteExpense(${e.id})" title="Futa">🗑️</button>` : ''}
+          ${hasPermission('expenses', 'edit') ? `<button class="text-blue-600" onclick="window.editExpense(${e.id})" title="Hariri">✏️</button>` : ''}
+          ${hasPermission('expenses', 'delete') ? `<button class="text-red-600 ml-2" onclick="window.deleteExpense(${e.id})" title="Futa">🗑️</button>` : ''}
         </td>
       </tr>`;
   }).join('');
@@ -274,14 +267,13 @@ function renderExpenses() {
 
 function bindEvents() {
   document.getElementById('add-expense-btn')?.addEventListener('click', () => openExpenseModal());
-  document.getElementById('filter-status')?.addEventListener('change', applyFilters);
   document.getElementById('filter-plot')?.addEventListener('change', applyFilters);
   document.getElementById('filter-from')?.addEventListener('change', applyFilters);
   document.getElementById('filter-to')?.addEventListener('change', applyFilters);
   document.getElementById('filter-search')?.addEventListener('input', debounce(applyFilters, 300));
   document.getElementById('export-btn')?.addEventListener('click', (e) => exportExpenses(e.currentTarget));
   document.getElementById('clear-filters')?.addEventListener('click', () => {
-    ['filter-status','filter-plot','filter-from','filter-to','filter-search'].forEach(id => {
+    ['filter-plot','filter-from','filter-to','filter-search'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
@@ -435,7 +427,8 @@ function openExpenseModal(expense = null) {
         supplier_name: fd.get('supplier_name') || null,
         payment_method: fd.get('payment_method') || null,
         reference_number: fd.get('reference_number') || null,
-        receipt_url
+        receipt_url,
+        status: 'approved'  // Auto-approve (single user mode)
       };
       if (!expense) {
         const profile = getCurrentProfile();
@@ -444,6 +437,8 @@ function openExpenseModal(expense = null) {
           data.created_by = profile.id;
           data.recorded_by = profile.id;
           data.user_id = profile.id;
+          data.approved_by = profile.id;
+          data.approved_at = new Date().toISOString();
         }
       }
       

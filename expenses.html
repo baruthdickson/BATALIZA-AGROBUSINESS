@@ -27,15 +27,6 @@
             <input type="search" id="filter-search" class="form-input" placeholder="Maelezo, supplier...">
           </div>
           <div>
-            <label class="form-label">Status</label>
-            <select id="filter-status" class="form-select">
-              <option value="">Zote</option>
-              <option value="pending">⏳ Inasubiri</option>
-              <option value="approved">✓ Imeidhinishwa</option>
-              <option value="rejected">✗ Imekataliwa</option>
-            </select>
-          </div>
-          <div>
             <label class="form-label">Shamba</label>
             <select id="filter-plot" class="form-select"></select>
           </div>
@@ -62,15 +53,14 @@
               <th>Shamba</th>
               <th>Maelezo / Kipengele</th>
               <th>Supplier</th>
+              <th>Malipo</th>
               <th class="text-right">Kiasi (TZS)</th>
-              <th>Status</th>
-              <th>Aliyeidhinisha</th>
               <th>Risiti</th>
               <th>Hatua</th>
             </tr>
           </thead>
           <tbody id="expenses-tbody">
-            <tr><td colspan="9" class="text-center text-gray-500 py-8">Inapakia...</td></tr>
+            <tr><td colspan="8" class="text-center text-gray-500 py-8">Inapakia...</td></tr>
           </tbody>
         </table>
         <div id="pagination" class="flex justify-between items-center p-4 text-sm text-gray-600 border-t border-green-100"></div>
