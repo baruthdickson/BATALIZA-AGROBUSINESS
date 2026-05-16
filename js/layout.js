@@ -2,7 +2,8 @@
 // LAYOUT - Sidebar + Topbar (shared across pages)
 // ============================================================================
 
-import { logout, getCurrentProfile, hasPermission, isPM } from './auth.js';
+import { logout, getCurrentProfile, hasPermission, isPM, isAccountant, getRoleName } from './auth.js';
+import { supabase } from './supabase.js';
 import { supabase } from './supabase.js';
 
 // ============================================================================
@@ -23,20 +24,37 @@ const ICONS = {
   logout: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>',
   admin: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>',
   requests: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  receipts: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/></svg>',
   external: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>'
 };
 
-const MENU_ITEMS = [
-  { icon: ICONS.dashboard, label: 'Dashboard', href: 'dashboard.html', perm: ['reports', 'view_dashboard'] },
-  { icon: ICONS.budget, label: 'Bajeti', href: 'budget.html', perm: ['budget', 'view'] },
-  { icon: ICONS.requests, label: 'Maombi ya Pesa', href: 'expense-requests.html', perm: ['expense_requests', 'view'] },
-  { icon: ICONS.expenses, label: 'Matumizi', href: 'expenses.html', perm: ['expenses', 'view'] },
-  { icon: ICONS.reports, label: 'Ripoti', href: 'reports.html', perm: ['reports', 'view_dashboard'] },
+// Menu items kwa kila role
+const MENU_PM = [
+  { icon: ICONS.dashboard, label: 'Dashboard', href: 'dashboard.html' },
+  { icon: ICONS.budget, label: 'Bajeti', href: 'budget.html' },
+  { icon: ICONS.requests, label: 'Maombi ya Pesa', href: 'expense-requests.html', badge: 'pending' },
+  { icon: ICONS.expenses, label: 'Matumizi', href: 'expenses.html' },
+  { icon: ICONS.reports, label: 'Ripoti', href: 'reports.html' },
+];
+
+const MENU_ACCOUNTANT = [
+  { icon: ICONS.dashboard, label: 'Dashboard', href: 'dashboard.html' },
+  { icon: ICONS.budget, label: 'Bajeti (Tazama tu)', href: 'budget.html' },
+  { icon: ICONS.requests, label: 'Maombi Yangu', href: 'expense-requests.html' },
+  { icon: ICONS.receipts, label: 'Risiti Zangu', href: 'receipts.html' },
+  { icon: ICONS.expenses, label: 'Matumizi', href: 'expenses.html' },
+];
+
+// Default kwa wengine
+const MENU_DEFAULT = [
+  { icon: ICONS.dashboard, label: 'Dashboard', href: 'dashboard.html' },
+  { icon: ICONS.budget, label: 'Bajeti', href: 'budget.html' },
+  { icon: ICONS.expenses, label: 'Matumizi', href: 'expenses.html' },
 ];
 
 const PM_ONLY_ITEMS = [
-  { icon: ICONS.users, label: 'Watumiaji', href: 'users.html', perm: ['users', 'view'] },
-  { icon: ICONS.settings, label: 'Mipangilio', href: 'settings.html', perm: ['system', 'edit_company'] },
+  { icon: ICONS.users, label: 'Watumiaji', href: 'users.html' },
+  { icon: ICONS.settings, label: 'Mipangilio', href: 'settings.html' },
 ];
 
 // Admin-only menu (haoni biashara)
@@ -142,15 +160,34 @@ export function initAdminLayout(pageTitle) {
 // ============================================================================
 // RENDER SIDEBAR (PM + Sub-users)
 // ============================================================================
-export function renderSidebar() {
+export async function renderSidebar() {
   const container = document.getElementById('sidebar-container');
   if (!container) return;
   
   const currentPage = window.location.pathname.split('/').pop() || 'dashboard.html';
   const profile = getCurrentProfile();
   
-  const visibleItems = MENU_ITEMS.filter(item => hasPermission(item.perm[0], item.perm[1]));
-  const visiblePMItems = PM_ONLY_ITEMS.filter(item => hasPermission(item.perm[0], item.perm[1]));
+  // Chagua menu kulingana na role
+  let visibleItems;
+  let visiblePMItems = [];
+  
+  if (isAccountant()) {
+    visibleItems = MENU_ACCOUNTANT;
+  } else if (isPM()) {
+    visibleItems = MENU_PM;
+    visiblePMItems = PM_ONLY_ITEMS;
+  } else {
+    visibleItems = MENU_DEFAULT;
+  }
+  
+  // Pata pending count kwa PM (kuonyesha badge)
+  let pendingCount = 0;
+  if (isPM()) {
+    try {
+      const { count } = await supabase.from('expense_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+      pendingCount = count || 0;
+    } catch (e) { /* ignore */ }
+  }
   
   container.innerHTML = `
     <!-- Mobile menu toggle -->
@@ -187,7 +224,8 @@ export function renderSidebar() {
         ${visibleItems.map(item => `
           <a href="${item.href}" class="flex items-center gap-3 px-4 py-3 hover:bg-green-800 transition ${currentPage === item.href ? 'bg-green-800 border-l-4 border-green-400' : ''}">
             <span class="text-green-100">${item.icon}</span>
-            <span class="text-sm">${item.label}</span>
+            <span class="text-sm flex-1">${item.label}</span>
+            ${item.badge === 'pending' && pendingCount > 0 ? `<span class="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5 animate-pulse">${pendingCount}</span>` : ''}
           </a>
         `).join('')}
         
@@ -335,8 +373,8 @@ async function loadNotifications() {
 // ============================================================================
 // INIT LAYOUT (call kwenye kila page)
 // ============================================================================
-export function initLayout(pageTitle) {
-  renderSidebar();
+export async function initLayout(pageTitle) {
+  await renderSidebar();
   renderTopbar(pageTitle);
   checkSetupHealth();
 }

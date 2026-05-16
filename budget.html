@@ -27,8 +27,19 @@
             <button id="expand-all-btn" class="btn btn-secondary text-xs">▼ Fungua Zote</button>
             <button id="collapse-all-btn" class="btn btn-secondary text-xs">▲ Funga Zote</button>
             <button id="export-btn" class="btn btn-secondary">📥 Export</button>
-            <button id="add-period-btn" class="btn btn-secondary">+ Bajeti Mpya</button>
-            <button id="add-category-btn" class="btn btn-primary">+ Shughuli</button>
+            <button id="add-period-btn" class="btn btn-secondary pm-only" style="display:none">+ Bajeti Mpya</button>
+            <button id="add-category-btn" class="btn btn-primary pm-only" style="display:none">+ Shughuli</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Read-only banner kwa muhasibu -->
+      <div id="readonly-banner" class="card hidden" style="background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); border-color: #60A5FA;">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">👁️</div>
+          <div>
+            <div class="font-bold text-blue-900">Hali ya Kutazama Tu (Read-Only)</div>
+            <div class="text-sm text-blue-800">Unaweza kutazama bajeti iliyopangwa lakini huwezi kuibadilisha. Tengeneza ombi la pesa kwenye <a href="expense-requests.html" class="underline font-bold">Maombi ya Pesa</a>.</div>
           </div>
         </div>
       </div>
@@ -45,13 +56,21 @@
   </main>
   
   <script type="module">
-    import { requireBusinessUser, requirePermission } from './js/auth.js';
+    import { requireBusinessUser, isPM, isAccountant } from './js/auth.js';
     import { initLayout } from './js/layout.js';
     import { initBudget } from './js/pages/budget.js';
     
     await requireBusinessUser();
-    if (!requirePermission('budget', 'view')) {}
-    initLayout('Bajeti');
+    await initLayout('Bajeti');
+    
+    // Show/hide elements based on role
+    if (isPM()) {
+      document.querySelectorAll('.pm-only').forEach(el => el.style.display = '');
+    }
+    if (isAccountant()) {
+      document.getElementById('readonly-banner').classList.remove('hidden');
+    }
+    
     await initBudget();
   </script>
 </body>

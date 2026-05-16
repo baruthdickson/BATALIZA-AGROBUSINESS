@@ -151,7 +151,15 @@ export function getCurrentUser() { return currentUser; }
 export function getCurrentProfile() { return currentProfile; }
 export function getPermissions() { return userPermissions; }
 export function isPM() {
-  return currentProfile?.role?.slug === 'project_manager' || currentProfile?.role?.slug === 'system_admin';
+  return currentProfile?.role?.slug === 'project_manager' || currentProfile?.role?.slug === 'system_admin' || currentProfile?.role?.name === 'project_manager';
+}
+
+export function isAccountant() {
+  return currentProfile?.role?.slug === 'accountant' || currentProfile?.role?.name === 'accountant';
+}
+
+export function getRoleName() {
+  return currentProfile?.role?.name || currentProfile?.role?.slug || 'user';
 }
 
 // ============================================================================

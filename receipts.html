@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://cdn.tailwindcss.com">
+  <link rel="preconnect" href="https://whexrklnrkigfqpdfzbt.supabase.co">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Risiti Zangu - BATALIZA AGROBUSINESS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="sidebar-container"></div>
+  <main class="lg:ml-64 min-h-screen">
+    <div id="topbar-container"></div>
+    <div class="p-4 lg:p-6 space-y-4">
+      
+      <!-- Stats -->
+      <div id="receipts-stats"></div>
+      
+      <!-- Filters -->
+      <div class="card">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex-1 min-w-[180px]">
+            <label class="form-label">🔍 Tafuta</label>
+            <input type="search" id="filter-search" class="form-input" placeholder="Receipt number, kusudi, supplier...">
+          </div>
+          <div>
+            <label class="form-label">Shamba</label>
+            <select id="filter-plot" class="form-select"></select>
+          </div>
+          <div>
+            <label class="form-label">Tangu</label>
+            <input type="date" id="filter-from" class="form-input">
+          </div>
+          <div>
+            <label class="form-label">Mpaka</label>
+            <input type="date" id="filter-to" class="form-input">
+          </div>
+          <button id="clear-filters" class="btn btn-secondary">✕ Futa</button>
+          <button id="export-all" class="btn btn-secondary">📥 Export Yote</button>
+        </div>
+      </div>
+      
+      <!-- Receipts Grid -->
+      <div id="receipts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="text-center text-gray-500 py-12 col-span-full">Inapakia risiti...</div>
+      </div>
+      
+    </div>
+  </main>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <script type="module">
+    import { requireBusinessUser } from './js/auth.js';
+    import { initLayout } from './js/layout.js';
+    import { initReceipts } from './js/pages/receipts.js';
+    
+    await requireBusinessUser();
+    await initLayout('Risiti Zangu');
+    await initReceipts();
+  </script>
+</body>
+</html>
