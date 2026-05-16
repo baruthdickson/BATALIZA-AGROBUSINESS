@@ -79,7 +79,7 @@
     
     await requireBusinessUser();
     if (!requirePermission('inventory', 'view')) throw new Error('No permission');
-    initLayout('Vifaa & Stock');
+    await initLayout('Vifaa & Stock');
     await initInventory();
   </script>
 </body>

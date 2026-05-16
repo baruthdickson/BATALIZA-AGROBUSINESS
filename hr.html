@@ -112,7 +112,7 @@
     
     await requireBusinessUser();
     if (!requirePermission('hr', 'view')) throw new Error('No permission');
-    initLayout('Wafanyakazi & Mahudhurio');
+    await initLayout('Wafanyakazi & Mahudhurio');
     await initHR();
   </script>
 </body>

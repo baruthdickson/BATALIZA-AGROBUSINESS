@@ -84,7 +84,7 @@
     
     await requireBusinessUser();
     if (!requirePermission('fleet', 'view')) throw new Error('No permission');
-    initLayout('Magari & Mafuta');
+    await initLayout('Magari & Mafuta');
     await initFleet();
   </script>
 </body>

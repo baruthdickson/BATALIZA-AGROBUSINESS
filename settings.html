@@ -96,7 +96,7 @@
     
     await requireBusinessUser();
     if (!requirePermission('system', 'edit_company')) throw new Error('No permission');
-    initLayout('Settings');
+    await initLayout('Settings');
     await initSettings();
   </script>
 </body>

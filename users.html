@@ -130,7 +130,7 @@
     
     await requireBusinessUser();
     if (!requirePermission('users', 'view')) throw new Error('No permission');
-    initLayout('Usimamizi wa Watumiaji');
+    await initLayout('Usimamizi wa Watumiaji');
     await initUsers();
   </script>
 </body>

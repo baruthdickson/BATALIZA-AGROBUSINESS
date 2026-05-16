@@ -62,7 +62,7 @@
     
     await requireBusinessUser();
     if (!requirePermission('payroll', 'view')) throw new Error('No permission');
-    initLayout('Mishahara');
+    await initLayout('Mishahara');
     await initPayroll();
   </script>
 </body>

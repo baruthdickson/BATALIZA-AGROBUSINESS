@@ -4,11 +4,9 @@
 
 import { logout, getCurrentProfile, hasPermission, isPM, isAccountant, getRoleName } from './auth.js';
 import { supabase } from './supabase.js';
-import { supabase } from './supabase.js';
 
 // ============================================================================
 // MENU ITEMS (kila item ina required permission)
-// ============================================================================
 // ============================================================================
 // FOCUS: Bajeti + Matumizi vinaonyeshwa kikamilifu.
 // Vingine vimefichwa kwa sasa (mteja ataongeza baadaye)

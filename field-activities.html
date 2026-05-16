@@ -55,7 +55,7 @@
     
     await requireBusinessUser();
     if (!requirePermission('field_activities', 'view')) throw new Error('No permission');
-    initLayout('Shughuli za Shamba');
+    await initLayout('Shughuli za Shamba');
     await initFieldActivities();
   </script>
 </body>

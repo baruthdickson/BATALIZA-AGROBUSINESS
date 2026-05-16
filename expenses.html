@@ -76,7 +76,7 @@
     
     await requireBusinessUser();
     if (!requirePermission('expenses', 'view')) {}
-    initLayout('Matumizi');
+    await initLayout('Matumizi');
     await initExpenses();
   </script>
 </body>
